@@ -1,0 +1,32 @@
+{
+  "days": ["MON", "TUE", "WED", "THU", "FRI"],
+  "from": "6:30",
+  "until": "8:10",
+  "leave": "8:00",
+  "showOnWake": true,
+  "kids": [
+    {
+      "name": "Alex",
+      "steps": [
+        { "at": "6:30", "do": "Up, dressed" },
+        { "at": "6:50", "do": "Breakfast" },
+        { "at": "7:15", "do": "Teeth, hair" },
+        { "at": "7:30", "do": "Bag, homework, phone charged" },
+        { "at": "7:50", "do": "Shoes, jacket" }
+      ],
+      "extras": { "WED": ["Gym clothes"] }
+    },
+    {
+      "name": "Sam",
+      "steps": [
+        { "at": "6:45", "do": "Up, dressed" },
+        { "at": "7:00", "do": "Breakfast" },
+        { "at": "7:25", "do": "Teeth, hair" },
+        { "at": "7:35", "do": "Make bed" },
+        { "at": "7:45", "do": "Bag and lunch" },
+        { "at": "7:55", "do": "Shoes, jacket" }
+      ],
+      "extras": { "TUE": ["PE kit"], "THU": ["Library book"] }
+    }
+  ]
+}

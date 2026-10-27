@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 16:9 banner: a sun rising behind a checklist. Own art. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp"
+    android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#101418" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FFB74D" android:pathData="M60,130a50,50 0 0 1 100,0z" />
+    <path android:fillColor="#FFB74D" android:pathData="M36,140h148v6h-148z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="6" android:fillColor="#00000000"
+        android:pathData="M196,52l8,8l14,-16M196,92l8,8l14,-16" />
+    <path android:fillColor="#FFFFFF" android:pathData="M230,50h60v8h-60zM230,90h60v8h-60z" />
+    <path android:fillColor="#8B949E" android:pathData="M200,126h12v12h-12zM230,128h60v8h-60z" />
+</vector>
