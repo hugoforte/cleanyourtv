@@ -40,8 +40,13 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 | `from`, `until` | The window, in 24-hour `H:mm` |
 | `leave` | When everyone leaves, inside the window; the countdown runs to it |
 | `showOnWake` | `true` opens the board by itself when the TV is switched on, or boots, inside the window. Off when left out |
-| `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out |
+| `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out. **Not on a Sony BRAVIA**: there an app's wake from deep standby turns Android on but leaves the panel dark, so a press of the power button then turns the TV off; use the TV's own on-timer instead (below) |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
+
+To have the board up when everyone comes down, let the TV's own on-timer switch it on at `from`, with `showOnWake`
+on. A Sony BRAVIA's (Settings → Timers & Clock → Timer: Every Mon-Fri, the time, a duration, an input) switches to
+its input a second after waking, over the board; the board comes back on top a few seconds later, since it opens
+again 3 and 8 seconds after the screen turns on inside the window.
 
 A file that breaks any of these is refused: the install script stops with the reason, the board shows it, and the
 routine already on the TV stays. While the window is open the board keeps the screen on, so the screensaver does not

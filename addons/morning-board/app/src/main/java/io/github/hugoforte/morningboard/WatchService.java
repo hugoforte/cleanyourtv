@@ -8,7 +8,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 
 import java.time.LocalDateTime;
 
@@ -22,16 +24,25 @@ public class WatchService extends Service {
     static final String EXTRA_OPEN = "open";
     private static final String CHANNEL = "watch";
 
+    /**
+     * When to bring the board back after the screen comes on. A TV's own on-timer switches to its input a second or
+     * so after waking (a Sony BRAVIA's does, over the board), so the board comes back once that has happened.
+     */
+    private static final long[] AGAIN_MS = {3_000, 8_000};
+
+    private final Handler main = new Handler(Looper.getMainLooper());
+
     private final BroadcastReceiver screenOn = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             openInWindow();
+            for (long ms : AGAIN_MS) main.postDelayed(WatchService.this::openInWindow, ms);
         }
     };
 
     private void openInWindow() {
         Routine r = wanted();
-        if (r != null && r.inWindow(LocalDateTime.now())) {
+        if (r != null && r.inWindow(LocalDateTime.now()) && !BoardActivity.showing()) {
             startActivity(new Intent(this, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
     }
@@ -72,6 +83,7 @@ public class WatchService extends Service {
 
     @Override
     public void onDestroy() {
+        main.removeCallbacksAndMessages(null);
         unregisterReceiver(screenOn);
         super.onDestroy();
     }
