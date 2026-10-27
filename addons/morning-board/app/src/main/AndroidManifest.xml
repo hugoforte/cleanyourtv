@@ -77,6 +77,17 @@
             android:name=".AlarmReceiver"
             android:exported="false" />
 
+        <!-- Only for music: Android hands an app the music app's media session while it holds an allowed notification
+             listener. It reads no notifications; the install script allows it. -->
+        <service
+            android:name=".MediaListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Its only job is the "lock screen" global action, which on Android 9 and later puts the TV to standby: an
              ordinary app has no other way to. It asks for no events and cannot read the screen. -->
         <service

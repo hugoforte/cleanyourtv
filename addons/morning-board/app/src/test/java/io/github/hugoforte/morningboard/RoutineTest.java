@@ -227,6 +227,39 @@ public class RoutineTest {
     }
 
     @Test
+    public void musicPlaysOnSpotifyUnlessToldOtherwise() {
+        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,",
+                "\"music\": {\"uri\": \"spotify:playlist:37i9dQZF1DXcBWIGoYBM5M\", \"until\": \"7:10\"},"));
+        assertEquals("com.spotify.tv.android", r.music.app);
+    }
+
+    @Test
+    public void musicThatOutlastsTheWindowIsRefused() {
+        assertEquals("\"music\".\"until\" must be after \"from\" and no later than \"until\"", refusal(SCHOOL_DAYS.replace(
+                "\"showOnWake\": true,", "\"music\": {\"uri\": \"spotify:playlist:x\", \"until\": \"9:00\"},")));
+    }
+
+    @Test
+    public void musicWithNoUriIsRefused() {
+        assertEquals("\"music\".\"uri\" is not a URI: \"my playlist\"", refusal(SCHOOL_DAYS.replace(
+                "\"showOnWake\": true,", "\"music\": {\"uri\": \"my playlist\", \"until\": \"7:10\"},")));
+    }
+
+    @Test
+    public void theMusicStopIsNextMorningOnceItHasPassed() {
+        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,",
+                "\"music\": {\"uri\": \"spotify:playlist:x\", \"until\": \"7:10\"},"));
+        assertEquals(at(MONDAY.plusDays(1), 7, 10), r.nextMusicStop(at(MONDAY, 7, 10)));
+    }
+
+    @Test
+    public void theChimeNeverClips() {
+        short peak = 0;
+        for (short s : Chime.samples()) peak = (short) Math.max(peak, Math.abs(s));
+        assertTrue(peak < Short.MAX_VALUE * 0.4);
+    }
+
+    @Test
     public void aRoutineWithNoKidsIsRefused() {
         assertEquals("\"kids\" needs 1 to 4 entries, not 0",
                 refusal(SCHOOL_DAYS.substring(0, SCHOOL_DAYS.indexOf("\"kids\"")) + "\"kids\": []}"));

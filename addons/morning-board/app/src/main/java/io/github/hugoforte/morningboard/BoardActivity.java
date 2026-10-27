@@ -93,8 +93,28 @@ public class BoardActivity extends Activity {
         main.post(refresh);
     }
 
+    /** Each kid's step under way at the last rebuild, while the board has been up; null before the first. */
+    private int[] lastSteps;
+
+    /** A chime when any kid's next step comes due while the board is up; none when it first opens. */
+    private void chimeOnNewStep(Routine routine, LocalTime now) {
+        if (now == null) {
+            lastSteps = null;
+            return;
+        }
+        int[] steps = new int[routine.kids.size()];
+        boolean moved = false;
+        for (int k = 0; k < steps.length; k++) {
+            steps[k] = Routine.current(routine.kids.get(k), now);
+            if (lastSteps != null && lastSteps.length == steps.length && steps[k] > lastSteps[k]) moved = true;
+        }
+        lastSteps = steps;
+        if (moved) Chime.play();
+    }
+
     @Override
     protected void onPause() {
+        lastSteps = null;
         showing = false;
         main.removeCallbacks(refresh);
         super.onPause();
@@ -146,6 +166,7 @@ public class BoardActivity extends Activity {
         leave.setText(today ? Routine.leaveText(routine.minutesToLeave(now.toLocalTime()))
                 : "From " + routine.from.format(time));
 
+        chimeOnNewStep(routine, today ? now.toLocalTime() : null);
         Set<String> ticks = Store.ticks(this, day);
         for (int k = 0; k < routine.kids.size(); k++) {
             columns.addView(column(routine.kids.get(k), k, day, today, now.toLocalTime(), ticks),

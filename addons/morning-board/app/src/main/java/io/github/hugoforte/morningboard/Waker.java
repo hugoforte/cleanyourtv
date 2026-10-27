@@ -19,6 +19,8 @@ final class Waker {
     static final String SLEEP = "io.github.hugoforte.morningboard.SLEEP";
     /** The email of what is still unticked, at the routine's email.reportAt. */
     static final String REPORT = "io.github.hugoforte.morningboard.REPORT";
+    /** The morning's music paused, at the routine's music.until. */
+    static final String MUSIC_STOP = "io.github.hugoforte.morningboard.MUSIC_STOP";
 
     private Waker() {
     }
@@ -44,6 +46,9 @@ final class Waker {
         }
         if (r == null || r.email == null) am.cancel(report);
         else set(am, r.nextReport(now), report);
+        PendingIntent musicStop = alarm(c, MUSIC_STOP);
+        if (r == null || r.music == null) am.cancel(musicStop);
+        else set(am, r.nextMusicStop(now), musicStop);
     }
 
     private static PendingIntent alarm(Context c, String action) {

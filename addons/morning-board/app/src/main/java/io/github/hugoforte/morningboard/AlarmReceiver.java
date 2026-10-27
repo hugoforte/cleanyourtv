@@ -27,6 +27,13 @@ public class AlarmReceiver extends BroadcastReceiver {
             context.startActivity(new Intent(context, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } else if (Waker.SLEEP.equals(action)) {
             if (BoardActivity.showing()) SleepService.sleep();
+        } else if (Waker.MUSIC_STOP.equals(action)) {
+            try {
+                Routine r = Store.routine(context);
+                if (r != null) Music.stop(context, r);
+            } catch (IllegalArgumentException ignored) {
+                // A stored routine that no longer parses has no music to stop; the board says why.
+            }
         } else if (Waker.REPORT.equals(action)) {
             // The send is network work: keep the broadcast alive until it is done.
             PendingResult pending = goAsync();

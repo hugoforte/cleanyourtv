@@ -43,8 +43,12 @@ case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; e
 # Android 10 and later let an app open a screen from the background only when it may draw over other apps;
 # Android 12 and later withhold exact alarms unless allowed.
 tv "appops set $PKG SYSTEM_ALERT_WINDOW allow; appops set $PKG SCHEDULE_EXACT_ALARM allow 2>/dev/null; true"
-# The standby service for turnTvOn: it does nothing unless the routine asks for it.
-tv "s=\$(settings get secure enabled_accessibility_services); case :\$s: in *:$SVC:*) ;; *) if [ -z \$s ] || [ \$s = null ]; then s=$SVC; else s=\$s:$SVC; fi; settings put secure enabled_accessibility_services \$s;; esac; settings put secure accessibility_enabled 1"
+# The media-session access for music: it does nothing unless the routine has music.
+tv "cmd notification allow_listener $PKG/$PKG.MediaListener"
+# The accessibility service, for turnTvOn's standby and the music's Play button: it does nothing unless the routine
+# asks for one. Android binds a service with the capabilities it had when it was turned on, so it is turned off and
+# on again on every install, as the launcher's own script does.
+tv "s=\$(settings get secure enabled_accessibility_services); case :\$s: in *:$SVC:*) ;; *) if [ -z \$s ] || [ \$s = null ]; then s=$SVC; else s=\$s:$SVC; fi;; esac; settings put secure enabled_accessibility_services ''; sleep 1; settings put secure enabled_accessibility_services \$s; settings put secure accessibility_enabled 1"
 
 # The app's storage is out of the shell's reach, so each file goes in through the app's provider.
 push() {

@@ -26,9 +26,10 @@ public class WatchService extends Service {
 
     /**
      * When to bring the board back after the screen comes on. A TV's own on-timer switches to its input a second or
-     * so after waking (a Sony BRAVIA's does, over the board), so the board comes back once that has happened.
+     * so after waking, over the board; a Sony BRAVIA's does it again some 20 seconds in, once the clock it syncs on
+     * waking reaches the timer. So the board comes back several times in the first minute.
      */
-    private static final long[] AGAIN_MS = {3_000, 8_000};
+    private static final long[] AGAIN_MS = {3_000, 8_000, 15_000, 25_000, 40_000, 60_000};
 
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -37,12 +38,15 @@ public class WatchService extends Service {
         public void onReceive(Context context, Intent intent) {
             openInWindow();
             for (long ms : AGAIN_MS) main.postDelayed(WatchService.this::openInWindow, ms);
+            Routine r = wanted();
+            if (r != null) Music.morning(WatchService.this, r);
         }
     };
 
     private void openInWindow() {
         Routine r = wanted();
-        if (r != null && r.inWindow(LocalDateTime.now()) && !BoardActivity.showing()) {
+        // While the music is being started its app is in front on purpose; Music brings the board back after.
+        if (r != null && r.inWindow(LocalDateTime.now()) && !BoardActivity.showing() && !Music.starting()) {
             startActivity(new Intent(this, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         }
     }

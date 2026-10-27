@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- No events, no window content: the service only performs the lock-screen global action. -->
+<!-- No events. The service performs the lock-screen global action, and reads the music app's window only to press
+     its focused Play button; packageNames keeps every other app's windows out of its reach. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeAnnouncement"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:canRetrieveWindowContent="false"
+    android:canRetrieveWindowContent="true"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:packageNames="com.spotify.tv.android"
     android:description="@string/service_description"
     android:notificationTimeout="1000" />

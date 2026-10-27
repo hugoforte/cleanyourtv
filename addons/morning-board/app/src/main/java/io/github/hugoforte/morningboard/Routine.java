@@ -66,7 +66,22 @@ final class Routine {
     final boolean turnTvOn;
     /** Who hears how the morning went, and when the report of what is still unticked goes; null for no email. */
     final Email email;
+    /** What plays when the board comes up in the morning, and until when; null for no music. */
+    final Music music;
     final List<Kid> kids;
+
+    static final class Music {
+        final String uri;
+        /** The package that plays it: Spotify's TV app unless the routine says otherwise. */
+        final String app;
+        final LocalTime until;
+
+        Music(String uri, String app, LocalTime until) {
+            this.uri = uri;
+            this.app = app;
+            this.until = until;
+        }
+    }
 
     static final class Email {
         final List<String> to;
@@ -79,7 +94,7 @@ final class Routine {
     }
 
     private Routine(Set<DayOfWeek> days, LocalTime from, LocalTime until, LocalTime leave, boolean showOnWake,
-                    boolean turnTvOn, Email email, List<Kid> kids) {
+                    boolean turnTvOn, Email email, Music music, List<Kid> kids) {
         this.days = days;
         this.from = from;
         this.until = until;
@@ -87,6 +102,7 @@ final class Routine {
         this.showOnWake = showOnWake;
         this.turnTvOn = turnTvOn;
         this.email = email;
+        this.music = music;
         this.kids = kids;
     }
 
@@ -114,7 +130,9 @@ final class Routine {
             boolean showOnWake = o.has("showOnWake") && o.getBoolean("showOnWake");
             boolean turnTvOn = o.has("turnTvOn") && o.getBoolean("turnTvOn");
             Email email = o.has("email") ? email(o.getJSONObject("email"), from, until, leave) : null;
-            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, Collections.unmodifiableList(kids));
+            Music music = o.has("music") ? music(o.getJSONObject("music"), from, until) : null;
+            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, music,
+                    Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
@@ -173,6 +191,17 @@ final class Routine {
         return new Email(Collections.unmodifiableList(to), reportAt);
     }
 
+    private static Music music(JSONObject o, LocalTime from, LocalTime until) throws JSONException {
+        String uri = o.getString("uri").trim();
+        if (!uri.matches("[a-z][a-z0-9+.-]*:\\S+")) throw new IllegalArgumentException("\"music\".\"uri\" is not a URI: \"" + uri + "\"");
+        String app = o.optString("app", "com.spotify.tv.android").trim();
+        LocalTime stop = time(o, "until");
+        if (!stop.isAfter(from) || stop.isAfter(until)) {
+            throw new IllegalArgumentException("\"music\".\"until\" must be after \"from\" and no later than \"until\"");
+        }
+        return new Music(uri, app, stop);
+    }
+
     private static DayOfWeek day(String name) {
         String n = name.trim().toUpperCase(Locale.ROOT);
         for (DayOfWeek d : DayOfWeek.values()) {
@@ -218,6 +247,11 @@ final class Routine {
     /** The next report of what is still unticked, after t; only for a routine with email. */
     LocalDateTime nextReport(LocalDateTime t) {
         return next(t, email.reportAt);
+    }
+
+    /** The next time after t the morning's music stops; only for a routine with music. */
+    LocalDateTime nextMusicStop(LocalDateTime t) {
+        return next(t, music.until);
     }
 
     private LocalDateTime next(LocalDateTime t, LocalTime time) {

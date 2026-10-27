@@ -70,7 +70,10 @@ final class Store {
                 String json = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
                 if (name.equals(ROUTINE)) {
                     Routine.parse(json);
-                    prefs(c).edit().putString("routine", json).remove("problem").remove("ticks").apply();
+                    // A new routine is a fresh morning: its ticks, emails and music start over.
+                    SharedPreferences.Editor e = prefs(c).edit().putString("routine", json).remove("problem").remove("ticks");
+                    for (String key : prefs(c).getAll().keySet()) if (key.startsWith("mailed:")) e.remove(key);
+                    e.apply();
                 } else {
                     Mailer.Account.parse(json);
                     prefs(c).edit().putString("mail", json).remove("problem").remove("mailProblem").apply();
