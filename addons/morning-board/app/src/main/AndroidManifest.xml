@@ -55,9 +55,10 @@
                 android:value="Opens the morning board when the screen turns on during the morning" />
         </service>
 
+        <!-- Not exported: the system's boot and package-replaced broadcasts still reach it, other apps cannot. -->
         <receiver
             android:name=".BootReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

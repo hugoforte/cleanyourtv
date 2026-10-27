@@ -18,17 +18,23 @@ import java.time.LocalDateTime;
  * routine, or showOnWake off, it stops itself.
  */
 public class WatchService extends Service {
+    /** Open the board now if the window is open: a boot, whose screen came on before the receiver was registered. */
+    static final String EXTRA_OPEN = "open";
     private static final String CHANNEL = "watch";
 
     private final BroadcastReceiver screenOn = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Routine r = wanted();
-            if (r != null && r.inWindow(LocalDateTime.now())) {
-                startActivity(new Intent(context, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            }
+            openInWindow();
         }
     };
+
+    private void openInWindow() {
+        Routine r = wanted();
+        if (r != null && r.inWindow(LocalDateTime.now())) {
+            startActivity(new Intent(this, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        }
+    }
 
     @Override
     public void onCreate() {
@@ -50,6 +56,7 @@ public class WatchService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN, false)) openInWindow();
         return START_STICKY;
     }
 
