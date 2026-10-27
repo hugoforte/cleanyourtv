@@ -76,8 +76,11 @@ No network, no accounts, no libraries. The routine and the ticks stay in the app
 
 ## Tested on
 
-Not yet on a TV: the JVM tests cover the schedule (the window, which morning is shown, the step under way, the
-countdown) and the routine's refusals.
+Sony BRAVIA XBR-65X900E (Android TV 9), on the cleanyourtv launcher: installed with `build-and-install.ps1`, the card
+shown after **Show card**, the board showing the next morning's plan outside the window (the screenshot, with
+`example-routine.json`), a routine pushed and taken, and the screen watcher running as a foreground service. The JVM
+tests cover the schedule (the window, which morning is shown, the step under way, the countdown) and the routine's
+refusals.
 
 ## Maintainer
 
