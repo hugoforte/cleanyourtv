@@ -129,6 +129,51 @@ public class RoutineTest {
     }
 
     @Test
+    public void aLeaveTimeAfterTheWindowIsRefused() {
+        assertEquals("\"leave\" must be between \"from\" and \"until\"", refusal(SCHOOL_DAYS.replace("\"8:00\"", "\"8:30\"")));
+    }
+
+    @Test
+    public void aLeaveTimeBeforeTheWindowIsRefused() {
+        assertEquals("\"leave\" must be between \"from\" and \"until\"", refusal(SCHOOL_DAYS.replace("\"8:00\"", "\"6:00\"")));
+    }
+
+    @Test
+    public void aStepAtTheEndOfTheWindowIsRefused() {
+        assertEquals("Sam's step at 8:10 is outside \"from\" to \"until\"",
+                refusal(SCHOOL_DAYS.replace("\"at\": \"7:50\"", "\"at\": \"8:10\"")));
+    }
+
+    @Test
+    public void twoStepsAtOneTimeAreRefused() {
+        assertEquals("Sam has two steps at 7:00; give each its own time",
+                refusal(SCHOOL_DAYS.replace("\"at\": \"7:50\"", "\"at\": \"7:00\"")));
+    }
+
+    @Test
+    public void aShowOnWakeThatIsNotTrueOrFalseIsRefused() {
+        refusal(SCHOOL_DAYS.replace("\"showOnWake\": true", "\"showOnWake\": \"yes\""));
+    }
+
+    @Test
+    public void fiveKidsAreRefused() {
+        String kid = SCHOOL_DAYS.substring(SCHOOL_DAYS.indexOf("{\"name\""), SCHOOL_DAYS.length() - 2);
+        String five = SCHOOL_DAYS.substring(0, SCHOOL_DAYS.indexOf("\"kids\"")) + "\"kids\": ["
+                + String.join(",", kid, kid, kid, kid, kid) + "]}";
+        assertEquals("\"kids\" needs 1 to 4 entries, not 5", refusal(five));
+    }
+
+    @Test
+    public void theCountdownSaysWhenItIsTimeToGo() {
+        assertEquals("Time to go!", Routine.leaveText(0));
+    }
+
+    @Test
+    public void aLongCountdownIsInHoursAndMinutes() {
+        assertEquals("Leave in 1 h 30 min", Routine.leaveText(90));
+    }
+
+    @Test
     public void aRoutineWithNoKidsIsRefused() {
         assertEquals("\"kids\" needs 1 to 4 entries, not 0",
                 refusal(SCHOOL_DAYS.substring(0, SCHOOL_DAYS.indexOf("\"kids\"")) + "\"kids\": []}"));

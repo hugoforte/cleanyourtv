@@ -86,30 +86,43 @@ final class Routine {
             LocalTime until = time(o, "until");
             LocalTime leave = time(o, "leave");
             if (!from.isBefore(until)) throw new IllegalArgumentException("\"from\" must be before \"until\"");
+            if (leave.isBefore(from) || leave.isAfter(until)) {
+                throw new IllegalArgumentException("\"leave\" must be between \"from\" and \"until\"");
+            }
             JSONArray k = o.getJSONArray("kids");
             if (k.length() < 1 || k.length() > MAX_KIDS) {
                 throw new IllegalArgumentException("\"kids\" needs 1 to " + MAX_KIDS + " entries, not " + k.length());
             }
             List<Kid> kids = new ArrayList<>();
-            for (int i = 0; i < k.length(); i++) kids.add(kid(k.getJSONObject(i)));
-            return new Routine(days, from, until, leave, o.optBoolean("showOnWake", false),
-                    Collections.unmodifiableList(kids));
+            for (int i = 0; i < k.length(); i++) kids.add(kid(k.getJSONObject(i), from, until));
+            boolean showOnWake = o.has("showOnWake") && o.getBoolean("showOnWake");
+            return new Routine(days, from, until, leave, showOnWake, Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
     }
 
-    private static Kid kid(JSONObject o) throws JSONException {
+    private static Kid kid(JSONObject o, LocalTime from, LocalTime until) throws JSONException {
         String name = o.getString("name").trim();
         if (name.isEmpty()) throw new IllegalArgumentException("a kid has no \"name\"");
         JSONArray s = o.getJSONArray("steps");
         List<Step> steps = new ArrayList<>();
         for (int i = 0; i < s.length(); i++) {
             JSONObject step = s.getJSONObject(i);
-            steps.add(new Step(time(step, "at"), step.getString("do")));
+            LocalTime at = time(step, "at");
+            if (at.isBefore(from) || !at.isBefore(until)) {
+                throw new IllegalArgumentException(name + "'s step at " + at.format(TIME) + " is outside \"from\" to \"until\"");
+            }
+            steps.add(new Step(at, step.getString("do")));
         }
         if (steps.isEmpty()) throw new IllegalArgumentException(name + " has no \"steps\"");
         steps.sort(Comparator.comparing(x -> x.at));
+        for (int i = 1; i < steps.size(); i++) {
+            if (steps.get(i).at.equals(steps.get(i - 1).at)) {
+                throw new IllegalArgumentException(name + " has two steps at " + steps.get(i).at.format(TIME)
+                        + "; give each its own time");
+            }
+        }
         Map<DayOfWeek, List<String>> extras = new EnumMap<>(DayOfWeek.class);
         JSONObject e = o.optJSONObject("extras");
         if (e != null) {
@@ -169,5 +182,12 @@ final class Routine {
     long minutesToLeave(LocalTime t) {
         long seconds = Duration.between(t, leave).getSeconds();
         return seconds <= 0 ? seconds / 60 : (seconds + 59) / 60;
+    }
+
+    /** The countdown's words for minutesToLeave. */
+    static String leaveText(long minutes) {
+        if (minutes <= 0) return "Time to go!";
+        if (minutes < 60) return "Leave in " + minutes + " min";
+        return "Leave in " + minutes / 60 + " h " + minutes % 60 + " min";
     }
 }
