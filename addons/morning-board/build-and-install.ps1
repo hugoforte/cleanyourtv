@@ -36,7 +36,10 @@ if ($LASTEXITCODE) { throw 'build failed (JDK 17 and Android SDK 34 needed; see 
 $ErrorActionPreference = 'Stop'
 & $py -I (Join-Path $tools 'b64push.py') (Join-Path $here 'app\build\outputs\apk\release\app-release.apk') /data/local/tmp/morningboard.apk | Out-Null
 if ($LASTEXITCODE) { throw 'sending the APK failed; run this again' }
-Tv 'pm install -r /data/local/tmp/morningboard.apk; rm -f /data/local/tmp/morningboard.apk'
+# tv.py exits 0 whatever the command did, so the output says whether the install took.
+$out = (& $py -I (Join-Path $tools 'tv.py') 'pm install -r /data/local/tmp/morningboard.apk; rm -f /data/local/tmp/morningboard.apk') -join "`n"
+Write-Host $out
+if ("$out" -notmatch 'Success') { throw 'pm install failed (an APK signed on another machine needs -Uninstall first)' }
 # Android 10 and later let an app open a screen from the background only when it may draw over other apps.
 Tv "appops set $pkg SYSTEM_ALERT_WINDOW allow"
 
@@ -46,6 +49,9 @@ if ($Routine) {
     & $py -I (Join-Path $tools 'tv.py') --push (Resolve-Path $Routine).Path $stage | Out-Null
     if ($LASTEXITCODE) { throw 'sending the routine failed; run this again' }
     Tv "content write --uri content://$pkg.config/routine.json < $stage; rm -f $stage"
+    $answer = (& $py -I (Join-Path $tools 'tv.py') "content call --uri content://$pkg.config --method problem") -join "`n"
+    if ("$answer" -notmatch 'problem=none') { throw "the TV refused the routine and kept the one it had: $answer" }
+    Write-Host 'Routine taken.'
 }
 # Starting the watcher once takes the app out of the stopped state, without which Android withholds BOOT_COMPLETED.
 # It stops itself again when the routine does not ask for showOnWake.

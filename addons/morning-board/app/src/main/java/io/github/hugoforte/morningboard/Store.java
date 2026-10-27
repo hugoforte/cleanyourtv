@@ -33,11 +33,18 @@ final class Store {
         return prefs(c).getString("problem", null);
     }
 
-    /** Takes a pushed routine.json if there is one, and deletes it. True when there was one. */
-    static boolean importPushed(Context c) {
-        File dir = c.getExternalFilesDir(null);
-        File f = dir == null ? null : new File(dir, PUSHED);
-        if (f == null || !f.isFile()) return false;
+    /** Where a pushed routine.json lands: the app's internal storage, which no other app can read. */
+    static File pushed(Context c) {
+        return new File(c.getFilesDir(), PUSHED);
+    }
+
+    /**
+     * Takes a pushed routine.json if there is one, and deletes it. True when there was one. Synchronized: the
+     * provider's close listener and its "problem" call can both come for the same file.
+     */
+    static synchronized boolean importPushed(Context c) {
+        File f = pushed(c);
+        if (!f.isFile()) return false;
         try {
             String json = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
             Routine.parse(json);

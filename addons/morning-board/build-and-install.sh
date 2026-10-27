@@ -39,7 +39,9 @@ tv "appops set $PKG SYSTEM_ALERT_WINDOW allow"
 if [ -n "$ROUTINE" ]; then
   STAGE=/data/local/tmp/morningboard-routine.json
   tv --push "$ROUTINE" "$STAGE" >/dev/null
-  tv "content write --uri content://$PKG.config/routine.json < $STAGE; rm -f $STAGE; echo routine pushed"
+  tv "content write --uri content://$PKG.config/routine.json < $STAGE; rm -f $STAGE"
+  ANSWER=$(tv "content call --uri content://$PKG.config --method problem")
+  case "$ANSWER" in *problem=none*) echo "Routine taken." ;; *) echo "ERROR: the TV refused the routine and kept the one it had: $ANSWER" >&2; exit 1 ;; esac
 fi
 # Starting the watcher once takes the app out of the stopped state, without which Android withholds BOOT_COMPLETED.
 # It stops itself again when the routine does not ask for showOnWake.
