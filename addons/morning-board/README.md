@@ -14,8 +14,8 @@ answer **Show card** its tile reads "Morning" with an amber glow. On any other A
 | The step whose time has come, in amber; earlier ones dimmed | OK ticks a step off, or back on |
 | That day's extras under each column ("Today: PE kit") | |
 
-Ticks last for the morning and are gone the next. Outside the routine's window the board shows the next morning's
-plan, with nothing to tick.
+Every step has a box, and OK ticks it at any time: outside the routine's window the board shows the next morning's
+plan, and a step ticked then (a bag packed the night before) counts for that morning. Ticks are gone the morning after.
 
 ## The routine
 

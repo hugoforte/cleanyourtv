@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * The tile and module card open this, and so does the screen turning on in the morning with showOnWake. A clock and
  * how long until leaving, then a column per kid with the morning's steps: the one under way is highlighted, and OK
- * ticks a step off. Outside the window it shows the next morning's plan, without ticks.
+ * ticks a step off. Outside the window it shows the next morning's plan, whose steps can be ticked ahead.
  */
 public class BoardActivity extends Activity {
     private static final long REFRESH_MS = 15_000;
@@ -127,7 +127,7 @@ public class BoardActivity extends Activity {
         leave.setText(today ? Routine.leaveText(routine.minutesToLeave(now.toLocalTime()))
                 : "From " + routine.from.format(time));
 
-        Set<String> ticks = today ? Store.ticks(this, day) : java.util.Collections.emptySet();
+        Set<String> ticks = Store.ticks(this, day);
         for (int k = 0; k < routine.kids.size(); k++) {
             columns.addView(column(routine.kids.get(k), k, day, today, now.toLocalTime(), ticks),
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
@@ -153,14 +153,13 @@ public class BoardActivity extends Activity {
         int done = 0;
         for (int s = 0; s < kid.steps.size(); s++) if (ticks.contains(k + ":" + s)) done++;
         TextView progress = text(18, done == kid.steps.size() ? DONE : MUTED);
-        progress.setText(!today ? kid.steps.size() + " steps"
-                : done == kid.steps.size() ? "All done ✓" : done + " of " + kid.steps.size() + " done");
+        progress.setText(done == kid.steps.size() ? "All done ✓" : done + " of " + kid.steps.size() + " done");
         progress.setPadding(0, 0, 0, px(8));
         col.addView(progress);
 
         int current = today ? Routine.current(kid, now) : -1;
         for (int s = 0; s < kid.steps.size(); s++) {
-            col.addView(step(kid.steps.get(s), k + ":" + s, day, today, ticks.contains(k + ":" + s), s == current,
+            col.addView(step(kid.steps.get(s), k + ":" + s, day, ticks.contains(k + ":" + s), s == current,
                     today && s < current));
         }
 
@@ -174,10 +173,13 @@ public class BoardActivity extends Activity {
         return scroll;
     }
 
-    private TextView step(Routine.Step step, String key, LocalDate day, boolean today, boolean ticked,
-                          boolean current, boolean past) {
+    /** A step with its box: OK ticks it for the morning shown, so a bag packed the night before can be ticked then. */
+    private TextView step(Routine.Step step, String key, LocalDate day, boolean ticked, boolean current, boolean past) {
         TextView row = text(20, ticked ? DONE : current ? NOW : past ? MUTED : TEXT);
-        row.setText((ticked ? "✓  " : current ? "▶  " : "    ") + step.at.format(time) + "   " + step.what);
+        row.setText(step.at.format(time) + "   " + step.what);
+        row.setCompoundDrawablesRelativeWithIntrinsicBounds(ticked ? R.drawable.box_on : R.drawable.box_off, 0, 0, 0);
+        row.setCompoundDrawablePadding(px(14));
+        row.setGravity(Gravity.CENTER_VERTICAL);
         if (ticked) row.setPaintFlags(row.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
         if (current && !ticked) row.setTypeface(Typeface.DEFAULT_BOLD);
         row.setMaxLines(2);
@@ -186,12 +188,10 @@ public class BoardActivity extends Activity {
         row.setTag(key);
         row.setFocusable(true);
         row.setBackgroundResource(R.drawable.row);
-        if (today) {
-            row.setOnClickListener(v -> {
-                Store.toggle(this, day, key);
-                build();
-            });
-        }
+        row.setOnClickListener(v -> {
+            Store.toggle(this, day, key);
+            build();
+        });
         return row;
     }
 
