@@ -14,19 +14,20 @@ import android.os.ParcelFileDescriptor;
 import java.io.FileNotFoundException;
 
 /**
- * The install script writes routine.json here with `content write`, since an app's own storage is out of the ADB
- * shell's reach, then asks with `content call --method problem` whether it was taken. Write-only, one file name, and
- * only the ADB shell can call it (WRITE_SECURE_SETTINGS on the provider). The file is taken into the app's storage
- * and deleted once it is closed.
+ * The install script writes routine.json and mail.json here with `content write`, since an app's own storage is out
+ * of the ADB shell's reach, then asks with `content call --method problem` whether they were taken. Write-only, two
+ * file names, and only the ADB shell can call it (WRITE_SECURE_SETTINGS on the provider). A file is taken into the
+ * app's storage and deleted once it is closed.
  */
 public class ConfigProvider extends ContentProvider {
     static final String PROBLEM = "problem";
 
     @Override
     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
-        if (!mode.contains("w") || !Store.PUSHED.equals(uri.getLastPathSegment())) throw new FileNotFoundException(uri.toString());
+        String name = uri.getLastPathSegment();
+        if (!mode.contains("w") || !Store.PUSHED.contains(name)) throw new FileNotFoundException(uri.toString());
         try {
-            return ParcelFileDescriptor.open(Store.pushed(getContext()),
+            return ParcelFileDescriptor.open(Store.pushed(getContext(), name),
                     ParcelFileDescriptor.MODE_WRITE_ONLY | ParcelFileDescriptor.MODE_CREATE | ParcelFileDescriptor.MODE_TRUNCATE,
                     new Handler(Looper.getMainLooper()),
                     e -> Store.importPushed(getContext()));

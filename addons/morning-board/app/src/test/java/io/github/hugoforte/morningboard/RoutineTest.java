@@ -204,6 +204,29 @@ public class RoutineTest {
     }
 
     @Test
+    public void aRoutineWithoutEmailSendsNone() {
+        assertEquals(null, routine().email);
+    }
+
+    @Test
+    public void theReportDefaultsToTheLeaveTime() {
+        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,", "\"email\": {\"to\": [\"a@example.com\"]},"));
+        assertEquals(LocalTime.of(8, 0), r.email.reportAt);
+    }
+
+    @Test
+    public void anAddressThatIsNotOneIsRefused() {
+        assertEquals("\"mum\" in \"email\".\"to\" is not an email address",
+                refusal(SCHOOL_DAYS.replace("\"showOnWake\": true,", "\"email\": {\"to\": [\"mum\"]},")));
+    }
+
+    @Test
+    public void aReportAfterTheWindowIsRefused() {
+        assertEquals("\"email\".\"reportAt\" must be from \"from\" to before \"until\"", refusal(SCHOOL_DAYS.replace(
+                "\"showOnWake\": true,", "\"email\": {\"to\": [\"a@example.com\"], \"reportAt\": \"9:00\"},")));
+    }
+
+    @Test
     public void aRoutineWithNoKidsIsRefused() {
         assertEquals("\"kids\" needs 1 to 4 entries, not 0",
                 refusal(SCHOOL_DAYS.substring(0, SCHOOL_DAYS.indexOf("\"kids\"")) + "\"kids\": []}"));

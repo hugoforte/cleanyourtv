@@ -1,16 +1,18 @@
 # Windows version of build-and-install.sh: build Morning Board, install it on the TV, push a routine if given one,
 # start the screen watcher and open the board.
 #
-# Usage: addons\morning-board\build-and-install.ps1 -TvHost 192.168.1.50 [-Routine my-routine.json]
+# Usage: addons\morning-board\build-and-install.ps1 -TvHost 192.168.1.50 [-Routine my-routine.json] [-Mail mail.json]
 #        addons\morning-board\build-and-install.ps1 -TvHost 192.168.1.50 -Uninstall
 param(
     [string]$TvHost = $env:TV_HOST,
     [string]$Routine,
+    # The account the emails go from: {"host", "port", "user", "password"}. Keep it out of every repo.
+    [string]$Mail,
     [switch]$Uninstall
 )
 $ErrorActionPreference = 'Stop'
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
-if ($Routine -and -not (Test-Path $Routine -PathType Leaf)) { throw "no such file: $Routine" }
+foreach ($f in @($Routine, $Mail)) { if ($f -and -not (Test-Path $f -PathType Leaf)) { throw "no such file: $f" } }
 $env:TV_HOST = $TvHost
 $here = $PSScriptRoot
 $tools = Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'tools'
@@ -50,15 +52,16 @@ Tv "appops set $pkg SYSTEM_ALERT_WINDOW allow; appops set $pkg SCHEDULE_EXACT_AL
 # The standby service for turnTvOn: it does nothing unless the routine asks for it.
 Tv ('s=$(settings get secure enabled_accessibility_services); case :$s: in *:SVC:*) ;; *) if [ -z $s ] || [ $s = null ]; then s=SVC; else s=$s:SVC; fi; settings put secure enabled_accessibility_services $s;; esac; settings put secure accessibility_enabled 1'.Replace('SVC', $svc))
 
-if ($Routine) {
+foreach ($push in @(@{ File = $Routine; Name = 'routine.json' }, @{ File = $Mail; Name = 'mail.json' })) {
+    if (-not $push.File) { continue }
     # The app's storage is out of the shell's reach, so the file goes in through the app's provider.
-    $stage = '/data/local/tmp/morningboard-routine.json'
-    & $py -I (Join-Path $tools 'tv.py') --push (Resolve-Path $Routine).Path $stage | Out-Null
-    if ($LASTEXITCODE) { throw 'sending the routine failed; run this again' }
-    Tv "content write --uri content://$pkg.config/routine.json < $stage; rm -f $stage"
+    $stage = "/data/local/tmp/morningboard-$($push.Name)"
+    & $py -I (Join-Path $tools 'tv.py') --push (Resolve-Path $push.File).Path $stage | Out-Null
+    if ($LASTEXITCODE) { throw "sending $($push.Name) failed; run this again" }
+    Tv "content write --uri content://$pkg.config/$($push.Name) < $stage; rm -f $stage"
     $answer = (& $py -I (Join-Path $tools 'tv.py') "content call --uri content://$pkg.config --method problem") -join "`n"
-    if ("$answer" -notmatch 'problem=none') { throw "the TV refused the routine and kept the one it had: $answer" }
-    Write-Host 'Routine taken.'
+    if ("$answer" -notmatch 'problem=none') { throw "the TV refused $($push.Name) and kept what it had: $answer" }
+    Write-Host "$($push.Name) taken."
 }
 # Starting the watcher once takes the app out of the stopped state, without which Android withholds BOOT_COMPLETED.
 # It stops itself again when the routine does not ask for showOnWake.

@@ -64,16 +64,29 @@ final class Routine {
     final boolean showOnWake;
     /** Switch the TV on at "from" on the days it runs, and back to standby at "until" if the board is still up. */
     final boolean turnTvOn;
+    /** Who hears how the morning went, and when the report of what is still unticked goes; null for no email. */
+    final Email email;
     final List<Kid> kids;
 
+    static final class Email {
+        final List<String> to;
+        final LocalTime reportAt;
+
+        Email(List<String> to, LocalTime reportAt) {
+            this.to = to;
+            this.reportAt = reportAt;
+        }
+    }
+
     private Routine(Set<DayOfWeek> days, LocalTime from, LocalTime until, LocalTime leave, boolean showOnWake,
-                    boolean turnTvOn, List<Kid> kids) {
+                    boolean turnTvOn, Email email, List<Kid> kids) {
         this.days = days;
         this.from = from;
         this.until = until;
         this.leave = leave;
         this.showOnWake = showOnWake;
         this.turnTvOn = turnTvOn;
+        this.email = email;
         this.kids = kids;
     }
 
@@ -100,7 +113,8 @@ final class Routine {
             for (int i = 0; i < k.length(); i++) kids.add(kid(k.getJSONObject(i), from, until));
             boolean showOnWake = o.has("showOnWake") && o.getBoolean("showOnWake");
             boolean turnTvOn = o.has("turnTvOn") && o.getBoolean("turnTvOn");
-            return new Routine(days, from, until, leave, showOnWake, turnTvOn, Collections.unmodifiableList(kids));
+            Email email = o.has("email") ? email(o.getJSONObject("email"), from, until, leave) : null;
+            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
@@ -139,6 +153,24 @@ final class Routine {
             }
         }
         return new Kid(name, Collections.unmodifiableList(steps), extras);
+    }
+
+    private static Email email(JSONObject o, LocalTime from, LocalTime until, LocalTime leave) throws JSONException {
+        JSONArray t = o.getJSONArray("to");
+        List<String> to = new ArrayList<>();
+        for (int i = 0; i < t.length(); i++) {
+            String address = t.getString(i).trim();
+            if (!address.matches("[^@\\s<>]+@[^@\\s<>]+\\.[^@\\s<>]+")) {
+                throw new IllegalArgumentException("\"" + address + "\" in \"email\".\"to\" is not an email address");
+            }
+            to.add(address);
+        }
+        if (to.isEmpty()) throw new IllegalArgumentException("\"email\".\"to\" names nobody");
+        LocalTime reportAt = o.has("reportAt") ? time(o, "reportAt") : leave;
+        if (reportAt.isBefore(from) || !reportAt.isBefore(until)) {
+            throw new IllegalArgumentException("\"email\".\"reportAt\" must be from \"from\" to before \"until\"");
+        }
+        return new Email(Collections.unmodifiableList(to), reportAt);
     }
 
     private static DayOfWeek day(String name) {
@@ -181,6 +213,11 @@ final class Routine {
     /** The next time after t that the window closes: when turnTvOn puts the TV back to standby. */
     LocalDateTime nextUntil(LocalDateTime t) {
         return next(t, until);
+    }
+
+    /** The next report of what is still unticked, after t; only for a routine with email. */
+    LocalDateTime nextReport(LocalDateTime t) {
+        return next(t, email.reportAt);
     }
 
     private LocalDateTime next(LocalDateTime t, LocalTime time) {

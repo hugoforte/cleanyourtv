@@ -117,6 +117,7 @@ public class BoardActivity extends Activity {
 
         Routine routine;
         String problem = Store.problem(this);
+        if (problem == null) problem = Store.mailProblem(this);
         try {
             routine = Store.routine(this);
         } catch (IllegalArgumentException e) {
@@ -208,6 +209,8 @@ public class BoardActivity extends Activity {
         row.setBackgroundResource(R.drawable.row);
         row.setOnClickListener(v -> {
             Store.toggle(this, day, key);
+            Routine r = Store.routine(this);
+            if (r != null) Mail.afterTick(this, r, Integer.parseInt(key.substring(0, key.indexOf(':'))), day);
             build();
         });
         return row;

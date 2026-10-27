@@ -7,16 +7,20 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
- * The routine and the day's ticks, in the app's own storage (backups are off). The routine arrives as routine.json
- * pushed by the install script, which is read once and deleted; a file that does not parse leaves the routine as it
- * was and says why on the board.
+ * The routine, the mail account and the day's ticks, in the app's own storage (backups are off). The routine arrives
+ * as routine.json and the account as mail.json, pushed by the install script, each read once and deleted; a file
+ * that does not parse leaves what was there and says why on the board.
  */
 final class Store {
-    static final String PUSHED = "routine.json";
+    static final String ROUTINE = "routine.json";
+    static final String MAIL = "mail.json";
+    static final List<String> PUSHED = Arrays.asList(ROUTINE, MAIL);
 
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences("board", Context.MODE_PRIVATE);
@@ -28,35 +32,57 @@ final class Store {
         return json.isEmpty() ? null : Routine.parse(json);
     }
 
-    /** Why the last pushed routine.json was refused, or null when it was taken. */
+    /** The account the emails are sent from, or null when no mail.json was pushed. */
+    static Mailer.Account mail(Context c) {
+        String json = prefs(c).getString("mail", "");
+        return json.isEmpty() ? null : Mailer.Account.parse(json);
+    }
+
+    /** Why the last pushed file was refused, or null when it was taken. */
     static String problem(Context c) {
         return prefs(c).getString("problem", null);
     }
 
-    /** Where a pushed routine.json lands: the app's internal storage, which no other app can read. */
-    static File pushed(Context c) {
-        return new File(c.getFilesDir(), PUSHED);
+    /** Why the last email could not be sent, or null when it went. */
+    static String mailProblem(Context c) {
+        return prefs(c).getString("mailProblem", null);
+    }
+
+    static void mailResult(Context c, String problem) {
+        if (problem == null) prefs(c).edit().remove("mailProblem").apply();
+        else prefs(c).edit().putString("mailProblem", problem).apply();
+    }
+
+    /** Where a pushed file lands: the app's internal storage, which no other app can read. */
+    static File pushed(Context c, String name) {
+        return new File(c.getFilesDir(), name);
     }
 
     /**
-     * Takes a pushed routine.json if there is one, and deletes it. True when there was one. Synchronized: the
-     * provider's close listener and its "problem" call can both come for the same file.
+     * Takes the pushed files there are, and deletes them. Synchronized: the provider's close listener and its
+     * "problem" call can both come for the same file.
      */
-    static synchronized boolean importPushed(Context c) {
-        File f = pushed(c);
-        if (!f.isFile()) return false;
-        try {
-            String json = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-            Routine.parse(json);
-            prefs(c).edit().putString("routine", json).remove("problem").remove("ticks").apply();
-            Waker.schedule(c);
-        } catch (Exception e) {
-            prefs(c).edit().putString("problem", "routine.json was not taken: " + e.getMessage()).apply();
-        } finally {
-            //noinspection ResultOfMethodCallIgnored
-            f.delete();
+    static synchronized void importPushed(Context c) {
+        for (String name : PUSHED) {
+            File f = pushed(c, name);
+            if (!f.isFile()) continue;
+            try {
+                String json = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                if (name.equals(ROUTINE)) {
+                    Routine.parse(json);
+                    prefs(c).edit().putString("routine", json).remove("problem").remove("ticks").apply();
+                } else {
+                    Mailer.Account.parse(json);
+                    prefs(c).edit().putString("mail", json).remove("problem").remove("mailProblem").apply();
+                }
+                Waker.schedule(c);
+            } catch (Exception e) {
+                prefs(c).edit().putString("problem", name + " was not taken: " + e.getMessage()).apply();
+            } finally {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            }
         }
-        return true;
     }
 
     /** The steps ticked on that day, as "kid:step" indexes; another day's ticks read as none. */
@@ -70,5 +96,17 @@ final class Store {
         Set<String> ticks = ticks(c, day);
         if (!ticks.remove(key)) ticks.add(key);
         prefs(c).edit().putString("ticksDay", day.toString()).putStringSet("ticks", ticks).apply();
+    }
+
+    /** Records that something was emailed for that day and key, once: false when it already was. */
+    static synchronized boolean firstTime(Context c, LocalDate day, String what) {
+        String key = "mailed:" + day + ":" + what;
+        SharedPreferences p = prefs(c);
+        if (p.getBoolean(key, false)) return false;
+        SharedPreferences.Editor e = p.edit();
+        // Yesterday's marks are no use; keep the file small.
+        for (String old : p.getAll().keySet()) if (old.startsWith("mailed:") && !old.startsWith("mailed:" + day)) e.remove(old);
+        e.putBoolean(key, true).apply();
+        return true;
     }
 }

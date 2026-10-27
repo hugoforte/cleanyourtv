@@ -42,6 +42,12 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 | `showOnWake` | `true` opens the board by itself when the TV is switched on, or boots, inside the window. Off when left out |
 | `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out. **Not on a Sony BRAVIA**: there an app's wake from deep standby turns Android on but leaves the panel dark, so a press of the power button then turns the TV off; use the TV's own on-timer instead (below) |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
+| `email` | Optional: `to` (a list of addresses) and `reportAt` (inside the window; `leave` when left out). An email goes to them once a kid ticks every step inside the window, and at `reportAt` one listing what is still unticked, if anything. Needs a `mail.json` (below) |
+
+The emails go out through your own mail account, pushed as a second file that stays out of the routine and out of
+the repo: `{"host": "smtp.gmail.com", "port": 465, "user": "you@example.com", "password": "<app password>"}`, SMTP
+with TLS on connect. For Gmail the password is an [app password](https://myaccount.google.com/apppasswords). A send
+that fails says why on the board.
 
 To have the board up when everyone comes down, let the TV's own on-timer switch it on at `from`, with `showOnWake`
 on. A Sony BRAVIA's (Settings → Timers & Clock → Timer: Every Mon-Fri, the time, a duration, an input) switches to
@@ -58,11 +64,11 @@ JDK 17 and Android SDK platform 34 with build-tools 34.0.0, as for the launcher,
 README. The `gradlew` scripts reuse the launcher's pinned Gradle wrapper with this folder as the project.
 
 ```bash
-TV_HOST=<tv ip> addons/morning-board/build-and-install.sh [routine.json]
+TV_HOST=<tv ip> addons/morning-board/build-and-install.sh [routine.json [mail.json]]
 ```
 
 ```powershell
-addons\morning-board\build-and-install.ps1 -TvHost <tv ip> [-Routine routine.json]
+addons\morning-board\build-and-install.ps1 -TvHost <tv ip> [-Routine routine.json] [-Mail mail.json]
 ```
 
 Run it again with a new routine to change it; `--uninstall` (`-Uninstall`) removes the app. To build only:
@@ -78,7 +84,9 @@ Run it again with a new routine to change it; `--uninstall` (`-Uninstall`) remov
 | Accessibility service (`SleepService`) | Only for `turnTvOn`'s standby at the end of the window: the "lock screen" action, which on Android 9 and later puts the TV to sleep, as Sleep Timer's does. It asks for no events and reads nothing on screen. The install script enables it. |
 | `SYSTEM_ALERT_WINDOW` | Android 10 and later let an app open its screen from the background only with it; the install script grants it. Not needed on Android 9. |
 
-No network, no accounts, no libraries. The routine and the ticks stay in the app's own storage (backups are off).
+| `INTERNET` | Only for `email`: the mail server in `mail.json`, and nothing else. |
+
+No accounts beyond your own mail server, no telemetry, no libraries. The routine and the ticks stay in the app's own storage (backups are off).
 `ConfigProvider` takes a pushed file and answers whether it was taken, and only the ADB shell can use it (it requires
 `WRITE_SECURE_SETTINGS`, as Smart Home's does).
 

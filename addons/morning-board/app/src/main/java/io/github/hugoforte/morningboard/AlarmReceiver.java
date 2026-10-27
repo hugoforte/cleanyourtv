@@ -6,8 +6,9 @@ import android.content.Intent;
 import android.os.PowerManager;
 
 /**
- * turnTvOn's alarms. WAKE switches the screen on and opens the board; SLEEP puts the TV back to standby, but only
- * while the board is what is on screen, so a show someone started is left playing. Both set the next alarms.
+ * The routine's alarms. WAKE switches the screen on and opens the board; SLEEP puts the TV back to standby, but only
+ * while the board is what is on screen, so a show someone started is left playing; REPORT emails what is still
+ * unticked. Each sets the next alarms.
  */
 public class AlarmReceiver extends BroadcastReceiver {
     private static final long WAKE_HOLD_MS = 10_000;
@@ -26,6 +27,10 @@ public class AlarmReceiver extends BroadcastReceiver {
             context.startActivity(new Intent(context, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } else if (Waker.SLEEP.equals(action)) {
             if (BoardActivity.showing()) SleepService.sleep();
+        } else if (Waker.REPORT.equals(action)) {
+            // The send is network work: keep the broadcast alive until it is done.
+            PendingResult pending = goAsync();
+            Mail.report(context, pending::finish);
         }
         Waker.schedule(context);
     }

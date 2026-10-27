@@ -10,12 +10,15 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
- * The two alarms of turnTvOn: the TV on at the window's start, back to standby at its end. Set again after every
- * alarm, a boot, a clock change and a pushed routine; cancelled when the routine does not ask for them.
+ * The routine's alarms: turnTvOn's two (the TV on at the window's start, back to standby at its end) and the email
+ * report. Set again after every alarm, a boot, a clock change and a pushed file; cancelled when the routine does not
+ * ask for them.
  */
 final class Waker {
     static final String WAKE = "io.github.hugoforte.morningboard.WAKE";
     static final String SLEEP = "io.github.hugoforte.morningboard.SLEEP";
+    /** The email of what is still unticked, at the routine's email.reportAt. */
+    static final String REPORT = "io.github.hugoforte.morningboard.REPORT";
 
     private Waker() {
     }
@@ -30,14 +33,17 @@ final class Waker {
         AlarmManager am = c.getSystemService(AlarmManager.class);
         PendingIntent wake = alarm(c, WAKE);
         PendingIntent sleep = alarm(c, SLEEP);
+        PendingIntent report = alarm(c, REPORT);
+        LocalDateTime now = LocalDateTime.now();
         if (r == null || !r.turnTvOn) {
             am.cancel(wake);
             am.cancel(sleep);
-            return;
+        } else {
+            set(am, r.nextFrom(now), wake);
+            set(am, r.nextUntil(now), sleep);
         }
-        LocalDateTime now = LocalDateTime.now();
-        set(am, r.nextFrom(now), wake);
-        set(am, r.nextUntil(now), sleep);
+        if (r == null || r.email == null) am.cancel(report);
+        else set(am, r.nextReport(now), report);
     }
 
     private static PendingIntent alarm(Context c, String action) {
