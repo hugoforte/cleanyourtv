@@ -40,6 +40,7 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 | `from`, `until` | The window, in 24-hour `H:mm` |
 | `leave` | When everyone leaves, inside the window; the countdown runs to it |
 | `showOnWake` | `true` opens the board by itself when the TV is switched on, or boots, inside the window. Off when left out |
+| `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
 
 A file that breaks any of these is refused: the install script stops with the reason, the board shows it, and the
@@ -68,6 +69,8 @@ Run it again with a new routine to change it; `--uninstall` (`-Uninstall`) remov
 |---|---|
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` | Only for `showOnWake`: a service that hears the screen turn on. It stops itself when the routine does not ask for it. |
 | `RECEIVE_BOOT_COMPLETED` | Starts that service again after a reboot, and opens the board when the TV boots inside the window. |
+| `SCHEDULE_EXACT_ALARM`, `WAKE_LOCK` | Only for `turnTvOn`: alarms on the minute the window opens and closes, and the screen switched on with the first. |
+| Accessibility service (`SleepService`) | Only for `turnTvOn`'s standby at the end of the window: the "lock screen" action, which on Android 9 and later puts the TV to sleep, as Sleep Timer's does. It asks for no events and reads nothing on screen. The install script enables it. |
 | `SYSTEM_ALERT_WINDOW` | Android 10 and later let an app open its screen from the background only with it; the install script grants it. Not needed on Android 9. |
 
 No network, no accounts, no libraries. The routine and the ticks stay in the app's own storage (backups are off).

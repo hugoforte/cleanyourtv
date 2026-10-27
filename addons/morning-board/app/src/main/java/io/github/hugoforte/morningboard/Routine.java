@@ -62,15 +62,18 @@ final class Routine {
     final LocalTime until;
     final LocalTime leave;
     final boolean showOnWake;
+    /** Switch the TV on at "from" on the days it runs, and back to standby at "until" if the board is still up. */
+    final boolean turnTvOn;
     final List<Kid> kids;
 
     private Routine(Set<DayOfWeek> days, LocalTime from, LocalTime until, LocalTime leave, boolean showOnWake,
-                    List<Kid> kids) {
+                    boolean turnTvOn, List<Kid> kids) {
         this.days = days;
         this.from = from;
         this.until = until;
         this.leave = leave;
         this.showOnWake = showOnWake;
+        this.turnTvOn = turnTvOn;
         this.kids = kids;
     }
 
@@ -96,7 +99,8 @@ final class Routine {
             List<Kid> kids = new ArrayList<>();
             for (int i = 0; i < k.length(); i++) kids.add(kid(k.getJSONObject(i), from, until));
             boolean showOnWake = o.has("showOnWake") && o.getBoolean("showOnWake");
-            return new Routine(days, from, until, leave, showOnWake, Collections.unmodifiableList(kids));
+            boolean turnTvOn = o.has("turnTvOn") && o.getBoolean("turnTvOn");
+            return new Routine(days, from, until, leave, showOnWake, turnTvOn, Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
         }
@@ -167,6 +171,22 @@ final class Routine {
             day = day.plusDays(1);
         } while (!days.contains(day.getDayOfWeek()));
         return day;
+    }
+
+    /** The next time after t that the window opens: when turnTvOn switches the TV on. */
+    LocalDateTime nextFrom(LocalDateTime t) {
+        return next(t, from);
+    }
+
+    /** The next time after t that the window closes: when turnTvOn puts the TV back to standby. */
+    LocalDateTime nextUntil(LocalDateTime t) {
+        return next(t, until);
+    }
+
+    private LocalDateTime next(LocalDateTime t, LocalTime time) {
+        LocalDateTime at = t.toLocalDate().atTime(time);
+        while (!at.isAfter(t) || !days.contains(at.getDayOfWeek())) at = at.plusDays(1);
+        return at;
     }
 
     /** The step under way at t: the last one whose time has come, or -1 before the first. */

@@ -89,6 +89,36 @@ public class RoutineTest {
     }
 
     @Test
+    public void theTvIsSwitchedOnLaterTheSameMorning() {
+        assertEquals(at(MONDAY, 6, 30), routine().nextFrom(at(MONDAY, 5, 0)));
+    }
+
+    @Test
+    public void theTvIsNotSwitchedOnAgainAtTheMinuteItWas() {
+        assertEquals(at(MONDAY.plusDays(1), 6, 30), routine().nextFrom(at(MONDAY, 6, 30)));
+    }
+
+    @Test
+    public void afterFridayTheTvIsNextSwitchedOnMonday() {
+        assertEquals(at(MONDAY.plusWeeks(1), 6, 30), routine().nextFrom(at(FRIDAY, 7, 0)));
+    }
+
+    @Test
+    public void inTheWindowTheTvGoesBackToStandbyAtItsEnd() {
+        assertEquals(at(MONDAY, 8, 10), routine().nextUntil(at(MONDAY, 7, 0)));
+    }
+
+    @Test
+    public void turnTvOnIsOffUnlessAsked() {
+        assertFalse(routine().turnTvOn);
+    }
+
+    @Test
+    public void turnTvOnIsReadWhenAsked() {
+        assertTrue(Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true", "\"turnTvOn\": true")).turnTvOn);
+    }
+
+    @Test
     public void theCurrentStepIsTheLastOneStarted() {
         assertEquals(1, Routine.current(routine().kids.get(0), LocalTime.of(7, 49)));
     }

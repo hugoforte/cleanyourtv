@@ -18,9 +18,13 @@ $py = Join-Path $tools 'venv\Scripts\python.exe'
 if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Scripts\python.exe -m pip install -r tools\requirements.txt' }
 $pkg = 'io.github.hugoforte.morningboard'
 function Tv([string]$cmd) { & $py -I (Join-Path $tools 'tv.py') $cmd; if ($LASTEXITCODE) { throw "tv.py failed: $cmd" } }
+# turnTvOn's standby service, as Sleep Timer's install script enables its own.
+$svc = "$pkg/$pkg.SleepService"
 
+# No double quotes inside these commands: Windows PowerShell 5.1 mangles them on the way to python, and the
+# values have no spaces.
 if ($Uninstall) {
-    Tv "pm uninstall $pkg"
+    Tv ('s=$(settings get secure enabled_accessibility_services); s=$(echo :$s: | sed s#:SVC:#:#); s=${s#:}; s=${s%:}; if [ -z $s ] || [ $s = null ]; then settings delete secure enabled_accessibility_services; else settings put secure enabled_accessibility_services $s; fi; pm uninstall PKG'.Replace('SVC', $svc).Replace('PKG', $pkg))
     exit 0
 }
 
@@ -40,8 +44,11 @@ if ($LASTEXITCODE) { throw 'sending the APK failed; run this again' }
 $out = (& $py -I (Join-Path $tools 'tv.py') 'pm install -r /data/local/tmp/morningboard.apk; rm -f /data/local/tmp/morningboard.apk') -join "`n"
 Write-Host $out
 if ("$out" -notmatch 'Success') { throw 'pm install failed (an APK signed on another machine needs -Uninstall first)' }
-# Android 10 and later let an app open a screen from the background only when it may draw over other apps.
-Tv "appops set $pkg SYSTEM_ALERT_WINDOW allow"
+# Android 10 and later let an app open a screen from the background only when it may draw over other apps;
+# Android 12 and later withhold exact alarms unless allowed.
+Tv "appops set $pkg SYSTEM_ALERT_WINDOW allow; appops set $pkg SCHEDULE_EXACT_ALARM allow 2>/dev/null; true"
+# The standby service for turnTvOn: it does nothing unless the routine asks for it.
+Tv ('s=$(settings get secure enabled_accessibility_services); case :$s: in *:SVC:*) ;; *) if [ -z $s ] || [ $s = null ]; then s=SVC; else s=$s:SVC; fi; settings put secure enabled_accessibility_services $s;; esac; settings put secure accessibility_enabled 1'.Replace('SVC', $svc))
 
 if ($Routine) {
     # The app's storage is out of the shell's reach, so the file goes in through the app's provider.

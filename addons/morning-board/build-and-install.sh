@@ -18,9 +18,11 @@ export MSYS_NO_PATHCONV=1
 PKG=io.github.hugoforte.morningboard
 # Script paths stay relative: with MSYS_NO_PATHCONV, Git Bash would hand Windows Python a /c/... path.
 tv() { "$PY" -I ../../tools/tv.py "$@"; }
+# turnTvOn's standby service, as Sleep Timer's install script enables its own.
+SVC=$PKG/$PKG.SleepService
 
 if [ "$ROUTINE" = "--uninstall" ]; then
-  tv "pm uninstall $PKG"
+  tv "s=\$(settings get secure enabled_accessibility_services); s=\$(echo :\$s: | sed s#:$SVC:#:#); s=\${s#:}; s=\${s%:}; if [ -z \$s ] || [ \$s = null ]; then settings delete secure enabled_accessibility_services; else settings put secure enabled_accessibility_services \$s; fi; pm uninstall $PKG"
   exit 0
 fi
 
@@ -32,8 +34,11 @@ if [ -n "${JAVA_HOME:-}" ]; then export PATH="$JAVA_HOME/bin:$PATH"; fi
 OUT=$(tv 'pm install -r /data/local/tmp/morningboard.apk; rm -f /data/local/tmp/morningboard.apk')
 echo "$OUT"
 case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; esac
-# Android 10 and later let an app open a screen from the background only when it may draw over other apps.
-tv "appops set $PKG SYSTEM_ALERT_WINDOW allow"
+# Android 10 and later let an app open a screen from the background only when it may draw over other apps;
+# Android 12 and later withhold exact alarms unless allowed.
+tv "appops set $PKG SYSTEM_ALERT_WINDOW allow; appops set $PKG SCHEDULE_EXACT_ALARM allow 2>/dev/null; true"
+# The standby service for turnTvOn: it does nothing unless the routine asks for it.
+tv "s=\$(settings get secure enabled_accessibility_services); case :\$s: in *:$SVC:*) ;; *) if [ -z \$s ] || [ \$s = null ]; then s=$SVC; else s=\$s:$SVC; fi; settings put secure enabled_accessibility_services \$s;; esac; settings put secure accessibility_enabled 1"
 
 # The app's storage is out of the shell's reach, so the file goes in through the app's provider.
 if [ -n "$ROUTINE" ]; then

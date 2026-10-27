@@ -49,6 +49,7 @@ final class Store {
             String json = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
             Routine.parse(json);
             prefs(c).edit().putString("routine", json).remove("problem").remove("ticks").apply();
+            Waker.schedule(c);
         } catch (Exception e) {
             prefs(c).edit().putString("problem", "routine.json was not taken: " + e.getMessage()).apply();
         } finally {

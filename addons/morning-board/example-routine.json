@@ -4,6 +4,7 @@
   "until": "8:10",
   "leave": "8:00",
   "showOnWake": true,
+  "turnTvOn": true,
   "kids": [
     {
       "name": "Alex",

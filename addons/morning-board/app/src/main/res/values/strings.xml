@@ -2,4 +2,6 @@
 <resources>
     <string name="app_name">Morning Board</string>
     <string name="watching">Morning board when the TV turns on</string>
+    <string name="service_label">Morning Board</string>
+    <string name="service_description">Puts the TV back to standby when the morning is over and the board is still on screen. It reads nothing on the screen.</string>
 </resources>

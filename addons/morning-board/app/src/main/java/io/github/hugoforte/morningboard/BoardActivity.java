@@ -3,6 +3,7 @@ package io.github.hugoforte.morningboard;
 import android.app.Activity;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -53,7 +54,15 @@ public class BoardActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        time = DateTimeFormatter.ofPattern(android.text.format.DateFormat.is24HourFormat(this) ? "H:mm" : "h:mm");
+        // Opened by turnTvOn's alarm, the board brings the screen up with it.
+        if (Build.VERSION.SDK_INT >= 27) {
+            setTurnScreenOn(true);
+            setShowWhenLocked(true);
+        } else {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+        }
+        time =DateTimeFormatter.ofPattern(android.text.format.DateFormat.is24HourFormat(this) ? "H:mm" : "h:mm");
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(BACKGROUND);
@@ -79,14 +88,23 @@ public class BoardActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        showing = true;
         Store.importPushed(this);
         main.post(refresh);
     }
 
     @Override
     protected void onPause() {
+        showing = false;
         main.removeCallbacks(refresh);
         super.onPause();
+    }
+
+    private static volatile boolean showing;
+
+    /** Whether the board is the screen in front, which is when turnTvOn may put the TV back to standby. */
+    static boolean showing() {
+        return showing;
     }
 
     /** Rebuilds the board from the clock and the ticks; focus stays on the step it was on. */
