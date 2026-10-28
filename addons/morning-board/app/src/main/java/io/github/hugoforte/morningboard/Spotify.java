@@ -70,6 +70,15 @@ final class Spotify {
         call("PUT", "/me/player/pause", null);
     }
 
+    /**
+     * Whether a refusal says to ask again soon: a device Spotify does not know yet (404), too many requests (429), or
+     * Spotify itself failing (5xx). Not a refusal that would only repeat, like 401 or 403 PREMIUM_REQUIRED.
+     */
+    static boolean tryLater(IOException refusal) {
+        String m = String.valueOf(refusal.getMessage());
+        return m.contains("(404)") || m.contains("(429)") || m.matches("(?s).*\\(5\\d\\d\\).*");
+    }
+
     static String deviceId(String devicesJson, String name) {
         try {
             JSONArray devices = new JSONObject(devicesJson).getJSONArray("devices");

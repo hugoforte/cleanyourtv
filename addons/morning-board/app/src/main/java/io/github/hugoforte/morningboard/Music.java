@@ -26,7 +26,7 @@ final class Music {
     private static final long OPEN_MS = 1_500;
     /** How long a cold-started music app may take to show up as a Connect device. */
     private static final long DEVICE_WAIT_MS = 30_000;
-    private static final int PLAY_ATTEMPTS = 8;
+    private static final int PLAY_ATTEMPTS = 12;
     /** Long enough for Spotify to have applied its own volume once playback starts. */
     private static final long VOLUME_AFTER_MS = 3_000;
     private static final int MAX_VOLUME_STEPS = 110;
@@ -144,7 +144,8 @@ final class Music {
 
     /**
      * Starts the playlist on a device that has only just shown up: Spotify lists a newly opened app's device a few
-     * seconds before it will take a command, and answers 404 until then, so the play is asked again.
+     * seconds before it will take a command, answering 404 or 502 until then (on the Bravia, 502 at 7:00 on
+     * 2026-10-28), so the play is asked again for as long as the answer says try later.
      */
     private static void playOnFreshDevice(Spotify spotify, String device, String uri) throws IOException {
         for (int attempt = 1; ; attempt++) {
@@ -152,8 +153,8 @@ final class Music {
                 spotify.play(device, uri);
                 return;
             } catch (IOException e) {
-                if (attempt >= PLAY_ATTEMPTS || !e.getMessage().contains("(404)")) throw e;
-                SystemClock.sleep(2_000);
+                if (attempt >= PLAY_ATTEMPTS || !Spotify.tryLater(e)) throw e;
+                SystemClock.sleep(3_000);
             }
         }
     }

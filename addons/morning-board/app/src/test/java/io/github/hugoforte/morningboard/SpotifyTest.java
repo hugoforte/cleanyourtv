@@ -1,10 +1,14 @@
 package io.github.hugoforte.morningboard;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
+
+import java.io.IOException;
 
 public class SpotifyTest {
     private static final String DEVICES = "{\"devices\": ["
@@ -24,6 +28,21 @@ public class SpotifyTest {
     @Test
     public void aSimilarNameIsNotTheDevice() {
         assertNull(Spotify.deviceId(DEVICES, "Living Room"));
+    }
+
+    @Test
+    public void aBadGatewayIsTriedAgain() {
+        assertTrue(Spotify.tryLater(new IOException("Spotify refused PUT /me/player/play?device_id=x (502): {}")));
+    }
+
+    @Test
+    public void anUnknownDeviceIsTriedAgain() {
+        assertTrue(Spotify.tryLater(new IOException("Spotify refused PUT /me/player/play?device_id=x (404): {}")));
+    }
+
+    @Test
+    public void premiumRequiredIsNotTriedAgain() {
+        assertFalse(Spotify.tryLater(new IOException("Spotify refused PUT /me/player/play?device_id=x (403): {}")));
     }
 
     @Test
