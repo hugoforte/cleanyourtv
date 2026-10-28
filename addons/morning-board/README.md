@@ -43,7 +43,7 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 | `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out. **Not on a Sony BRAVIA**: there an app's wake from deep standby turns Android on but leaves the panel dark, so a press of the power button then turns the TV off; use the TV's own on-timer instead (below) |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
 | `email` | Optional: `to` (a list of addresses) and `reportAt` (inside the window; `leave` when left out). An email goes to them once a kid ticks every step inside the window, and at `reportAt` one listing what is still unticked, if anything. Needs a `mail.json` (below) |
-| `greeting` | Optional: the heading over each column, with `{name}`, e.g. `"Good morning {name}! I love you ♥"`. The name alone when left out |
+| `greeting` | Optional: the heading a kid's column gets once every step is ticked, in place of the name, with `{name}`, e.g. `"Good morning {name}! I love you ♥"`. The name alone when left out |
 | `music` | Optional: `uri` (a `spotify:playlist:…`), `device` (the TV's Spotify Connect name, e.g. `"Living Room TV"`), `until` (when it pauses), and for a wake-up ramp `startVolume`, `rampEveryMinutes`, `rampStep` and `maxVolume` (percent; 60 when left out). Needs a `spotify.json` (below) |
 
 The board makes its own sounds: a two-note chime when a step comes due, and a happy run up a chord when a box is

@@ -68,7 +68,7 @@ final class Routine {
     final Email email;
     /** What plays when the board comes up in the morning, and until when; null for no music. */
     final Music music;
-    /** The heading over each kid's column, with {name} for the kid's name: "Good morning {name}!". */
+    /** The heading over a kid's column once every step is ticked, with {name} for the kid's name: "Good morning {name}!". */
     final String greeting;
     final List<Kid> kids;
 

@@ -187,13 +187,14 @@ public class BoardActivity extends Activity {
         col.setPadding(px(8), 0, px(16), 0);
         scroll.addView(col);
 
-        TextView name = text(26, TEXT);
-        name.setTypeface(Typeface.DEFAULT_BOLD);
-        name.setText(routine.greet(kid));
-        col.addView(name);
-
         int done = 0;
         for (int s = 0; s < kid.steps.size(); s++) if (ticks.contains(k + ":" + s)) done++;
+
+        // The greeting is the reward: the name until every step is ticked, then the greeting.
+        TextView name = text(26, TEXT);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setText(done == kid.steps.size() ? routine.greet(kid) : kid.name);
+        col.addView(name);
         TextView progress = text(18, done == kid.steps.size() ? DONE : MUTED);
         progress.setText(done == kid.steps.size() ? "All done ✓" : done + " of " + kid.steps.size() + " done");
         progress.setPadding(0, 0, 0, px(8));
