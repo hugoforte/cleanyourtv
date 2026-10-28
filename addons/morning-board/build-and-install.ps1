@@ -2,17 +2,20 @@
 # start the screen watcher and open the board.
 #
 # Usage: addons\morning-board\build-and-install.ps1 -TvHost 192.168.1.50 [-Routine my-routine.json] [-Mail mail.json]
+#            [-Spotify spotify.json]
 #        addons\morning-board\build-and-install.ps1 -TvHost 192.168.1.50 -Uninstall
 param(
     [string]$TvHost = $env:TV_HOST,
     [string]$Routine,
     # The account the emails go from: {"host", "port", "user", "password"}. Keep it out of every repo.
     [string]$Mail,
+    # The Spotify account the music starts with: {"clientId", "clientSecret", "refreshToken"}. Keep it out too.
+    [string]$Spotify,
     [switch]$Uninstall
 )
 $ErrorActionPreference = 'Stop'
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
-foreach ($f in @($Routine, $Mail)) { if ($f -and -not (Test-Path $f -PathType Leaf)) { throw "no such file: $f" } }
+foreach ($f in @($Routine, $Mail, $Spotify)) { if ($f -and -not (Test-Path $f -PathType Leaf)) { throw "no such file: $f" } }
 $env:TV_HOST = $TvHost
 $here = $PSScriptRoot
 $tools = Join-Path (Split-Path (Split-Path $here -Parent) -Parent) 'tools'
@@ -49,14 +52,12 @@ if ("$out" -notmatch 'Success') { throw 'pm install failed (an APK signed on ano
 # Android 10 and later let an app open a screen from the background only when it may draw over other apps;
 # Android 12 and later withhold exact alarms unless allowed.
 Tv "appops set $pkg SYSTEM_ALERT_WINDOW allow; appops set $pkg SCHEDULE_EXACT_ALARM allow 2>/dev/null; true"
-# The media-session access for music: it does nothing unless the routine has music.
-Tv "cmd notification allow_listener $pkg/$pkg.MediaListener"
-# The accessibility service, for turnTvOn's standby and the music's Play button: it does nothing unless the routine
-# asks for one. Android binds a service with the capabilities it had when it was turned on, so it is turned off and
+# The accessibility service, for turnTvOn's standby: it does nothing unless the routine asks for it. Android binds a service with the capabilities it had when it was turned on, so it is turned off and
 # on again on every install, as the launcher's own script does.
 Tv ('s=$(settings get secure enabled_accessibility_services); case :$s: in *:SVC:*) ;; *) if [ -z $s ] || [ $s = null ]; then s=SVC; else s=$s:SVC; fi;; esac; settings put secure enabled_accessibility_services ''''; sleep 1; settings put secure enabled_accessibility_services $s; settings put secure accessibility_enabled 1'.Replace('SVC', $svc))
 
-foreach ($push in @(@{ File = $Routine; Name = 'routine.json' }, @{ File = $Mail; Name = 'mail.json' })) {
+foreach ($push in @(@{ File = $Routine; Name = 'routine.json' }, @{ File = $Mail; Name = 'mail.json' },
+        @{ File = $Spotify; Name = 'spotify.json' })) {
     if (-not $push.File) { continue }
     # The app's storage is out of the shell's reach, so the file goes in through the app's provider.
     $stage = "/data/local/tmp/morningboard-$($push.Name)"

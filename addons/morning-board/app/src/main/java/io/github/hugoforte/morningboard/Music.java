@@ -1,36 +1,37 @@
 package io.github.hugoforte.morningboard;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
-import android.media.session.MediaController;
-import android.media.session.MediaSessionManager;
-import android.media.session.PlaybackState;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
-import android.view.KeyEvent;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * The morning's music: once a morning, when the screen comes on inside the window, open the music app on the
- * routine's link (a spotify:playlist:… for Spotify), press its focused Play button through SleepService, check the
- * player is playing and press again if not, then bring the board back on top while it plays. At music.until, pause
- * it. Spotify's TV app ignores a media session's playFromUri from an app it does not know, so the button is pressed
- * instead. The player's state is read through its media session, which needs the board's notification listener
- * allowed (the install script does it).
+ * The morning's music: once a morning, when the screen comes on inside the window, open the music app (so its
+ * Spotify Connect device comes up), wait for the device, set the TV's starting volume, start the routine's playlist
+ * on it through Spotify's Web API, and bring the board back on top while it plays; then ramp the volume up until
+ * someone ticks a step. At music.until, pause it. A failure is kept for the board to show, like a failed email.
  */
 final class Music {
     private static final String TAG = "MorningBoard";
     /** After the screen comes on, a TV's on-timer switches to its input; the music app opens after that. */
     private static final long OPEN_MS = 1_500;
-    /** Long enough for the music app to load the playlist page with its Play button focused. */
-    private static final long[] PRESS_MS = {5_000, 9_000};
-    private static final long BACK_MS = 2_000;
+    /** How long a cold-started music app may take to show up as a Connect device. */
+    private static final long DEVICE_WAIT_MS = 30_000;
+    private static final int PLAY_ATTEMPTS = 8;
+    /** Long enough for Spotify to have applied its own volume once playback starts. */
+    private static final long VOLUME_AFTER_MS = 3_000;
+    private static final int MAX_VOLUME_STEPS = 110;
+    private static final long VOLUME_STEP_MS = 250;
+    private static final ExecutorService NET = Executors.newSingleThreadExecutor();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     /** Until when (elapsed realtime) the music is being started, which the board's reopening waits for. */
@@ -49,61 +50,126 @@ final class Music {
         if (r.music == null || !r.inWindow(now) || !now.toLocalTime().isBefore(r.music.until)) return;
         if (!Store.firstTime(c, now.toLocalDate(), "music")) return;
         Context app = c.getApplicationContext();
-        startingUntil = SystemClock.elapsedRealtime() + OPEN_MS + PRESS_MS[PRESS_MS.length - 1] + BACK_MS;
-        MAIN.postDelayed(() -> {
+        startingUntil = SystemClock.elapsedRealtime() + OPEN_MS + DEVICE_WAIT_MS;
+        NET.execute(() -> {
             try {
+                Spotify.Account account = Store.spotify(app);
+                if (account == null) throw new IllegalStateException("no spotify.json was pushed, so no music can start");
+                SystemClock.sleep(OPEN_MS);
                 app.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.music.uri)).setPackage(r.music.app)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-            } catch (RuntimeException e) {
-                Log.w(TAG, "could not open " + r.music.app, e);
+                Spotify spotify = new Spotify(account);
+                String device = null;
+                long giveUp = SystemClock.elapsedRealtime() + DEVICE_WAIT_MS;
+                while (device == null && SystemClock.elapsedRealtime() < giveUp) {
+                    device = spotify.device(r.music.device);
+                    if (device == null) SystemClock.sleep(2_000);
+                }
+                if (device == null) {
+                    throw new IllegalStateException("Spotify never showed the device \"" + r.music.device + "\"");
+                }
+                playOnFreshDevice(spotify, device, r.music.uri);
+                // Spotify applies the volume it last had on the device as playback starts; the morning's comes after.
+                if (r.music.startVolume >= 0) {
+                    SystemClock.sleep(VOLUME_AFTER_MS);
+                    setVolume(app, r.music.startVolume);
+                }
+                Store.musicResult(app, null);
+                if (r.music.rampEveryMinutes > 0) MAIN.postDelayed(new Ramp(app), r.music.rampEveryMinutes * 60_000L);
+            } catch (Exception e) {
+                Log.w(TAG, "morning music not started", e);
+                Store.musicResult(app, "Music not started: " + e.getMessage());
+            } finally {
                 startingUntil = 0;
+                app.startActivity(new Intent(app, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            }
+        });
+    }
+
+    /**
+     * The wake-up ramp: every rampEveryMinutes, a ding and the TV's volume rampStep higher, up to maxVolume, until
+     * someone ticks a step or the music's time is up. It reads the routine afresh each time, so a new one takes over.
+     */
+    private static final class Ramp implements Runnable {
+        private final Context app;
+
+        Ramp(Context app) {
+            this.app = app;
+        }
+
+        @Override
+        public void run() {
+            Routine r;
+            try {
+                r = Store.routine(app);
+            } catch (IllegalArgumentException e) {
                 return;
             }
-            for (int i = 0; i < PRESS_MS.length; i++) {
-                boolean last = i == PRESS_MS.length - 1;
-                MAIN.postDelayed(() -> {
-                    if (!playing(app, r.music.app) && !SleepService.press(r.music.app)) {
-                        Log.w(TAG, "no Play button to press in " + r.music.app + "; is the board's accessibility service on?");
-                    }
-                    if (last) {
-                        MAIN.postDelayed(() -> {
-                            startingUntil = 0;
-                            app.startActivity(new Intent(app, BoardActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                        }, BACK_MS);
-                    }
-                }, PRESS_MS[i]);
+            LocalDateTime now = LocalDateTime.now();
+            if (r == null || r.music == null || r.music.rampEveryMinutes <= 0 || !r.inWindow(now)
+                    || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, now.toLocalDate()).isEmpty()) {
+                return;
             }
-        }, OPEN_MS);
-    }
-
-    /** Pauses the music app's player, at music.until. */
-    static void stop(Context c, Routine r) {
-        if (r.music == null) return;
-        MediaController player = player(c.getApplicationContext(), r.music.app);
-        if (player != null) {
-            player.getTransportControls().pause();
-        } else {
-            AudioManager audio = c.getSystemService(AudioManager.class);
-            audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE));
-            audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE));
+            Chime.play();
+            int to = r.music.raised(volume(app));
+            NET.execute(() -> setVolume(app, to));
+            MAIN.postDelayed(this, r.music.rampEveryMinutes * 60_000L);
         }
     }
 
-    private static boolean playing(Context c, String pkg) {
-        MediaController player = player(c, pkg);
-        PlaybackState state = player == null ? null : player.getPlaybackState();
-        return state != null && state.getState() == PlaybackState.STATE_PLAYING;
+    /** The TV's volume, in percent of the music stream's range. */
+    static int volume(Context c) {
+        AudioManager audio = c.getSystemService(AudioManager.class);
+        return Math.round(audio.getStreamVolume(AudioManager.STREAM_MUSIC) * 100f
+                / audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
     }
 
-    private static MediaController player(Context c, String pkg) {
-        try {
-            MediaSessionManager sessions = c.getSystemService(MediaSessionManager.class);
-            for (MediaController m : sessions.getActiveSessions(new ComponentName(c, MediaListener.class))) {
-                if (pkg.equals(m.getPackageName())) return m;
-            }
-        } catch (SecurityException e) {
-            Log.w(TAG, "the board's notification listener is not allowed", e);
+    /**
+     * Brings the TV's volume to percent one step at a time. A Sony BRAVIA moves its volume a single step for each
+     * change it is asked for, however far the asked-for level is, as its remote's volume button does; so the board
+     * steps until it gets there. Blocks while it steps: call it off the main thread.
+     */
+    static void setVolume(Context c, int percent) {
+        AudioManager audio = c.getSystemService(AudioManager.class);
+        int target = Math.round(percent * audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC) / 100f);
+        for (int i = 0; i < MAX_VOLUME_STEPS; i++) {
+            int now = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (now == target) return;
+            audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                    now < target ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER, 0);
+            SystemClock.sleep(VOLUME_STEP_MS);
         }
-        return null;
+        Log.w(TAG, "the volume did not reach " + percent + "%; it is " + volume(c) + "%");
+    }
+
+    /**
+     * Starts the playlist on a device that has only just shown up: Spotify lists a newly opened app's device a few
+     * seconds before it will take a command, and answers 404 until then, so the play is asked again.
+     */
+    private static void playOnFreshDevice(Spotify spotify, String device, String uri) throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                spotify.play(device, uri);
+                return;
+            } catch (IOException e) {
+                if (attempt >= PLAY_ATTEMPTS || !e.getMessage().contains("(404)")) throw e;
+                SystemClock.sleep(2_000);
+            }
+        }
+    }
+
+    /** Pauses the account's playback, at music.until. done runs once that has been asked. */
+    static void stop(Context c, Runnable done) {
+        Context app = c.getApplicationContext();
+        NET.execute(() -> {
+            try {
+                Spotify.Account account = Store.spotify(app);
+                if (account != null) new Spotify(account).pause();
+            } catch (Exception e) {
+                Log.w(TAG, "morning music not paused", e);
+            } finally {
+                done.run();
+            }
+        });
     }
 }

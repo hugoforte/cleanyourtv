@@ -226,30 +226,96 @@ public class RoutineTest {
                 "\"showOnWake\": true,", "\"email\": {\"to\": [\"a@example.com\"], \"reportAt\": \"9:00\"},")));
     }
 
+    private static String withMusic(String music) {
+        return SCHOOL_DAYS.replace("\"showOnWake\": true,", "\"music\": {" + music + "},");
+    }
+
     @Test
-    public void musicPlaysOnSpotifyUnlessToldOtherwise() {
-        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,",
-                "\"music\": {\"uri\": \"spotify:playlist:37i9dQZF1DXcBWIGoYBM5M\", \"until\": \"7:10\"},"));
+    public void musicOpensSpotifyUnlessToldOtherwise() {
+        Routine r = Routine.parse(withMusic(
+                "\"uri\": \"spotify:playlist:37i9dQZF1DXcBWIGoYBM5M\", \"device\": \"Living Room TV\", \"until\": \"7:10\""));
         assertEquals("com.spotify.tv.android", r.music.app);
     }
 
     @Test
+    public void musicNamesItsDevice() {
+        Routine r = Routine.parse(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"Living Room TV\", \"until\": \"7:10\""));
+        assertEquals("Living Room TV", r.music.device);
+    }
+
+    @Test
+    public void musicWithNoDeviceIsRefused() {
+        assertEquals("\"music\".\"device\" names no Spotify Connect device",
+                refusal(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \" \", \"until\": \"7:10\"")));
+    }
+
+    @Test
     public void musicThatOutlastsTheWindowIsRefused() {
-        assertEquals("\"music\".\"until\" must be after \"from\" and no later than \"until\"", refusal(SCHOOL_DAYS.replace(
-                "\"showOnWake\": true,", "\"music\": {\"uri\": \"spotify:playlist:x\", \"until\": \"9:00\"},")));
+        assertEquals("\"music\".\"until\" must be after \"from\" and no later than \"until\"",
+                refusal(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"9:00\"")));
     }
 
     @Test
     public void musicWithNoUriIsRefused() {
-        assertEquals("\"music\".\"uri\" is not a URI: \"my playlist\"", refusal(SCHOOL_DAYS.replace(
-                "\"showOnWake\": true,", "\"music\": {\"uri\": \"my playlist\", \"until\": \"7:10\"},")));
+        assertEquals("\"music\".\"uri\" is not a URI: \"my playlist\"",
+                refusal(withMusic("\"uri\": \"my playlist\", \"device\": \"TV\", \"until\": \"7:10\"")));
     }
 
     @Test
     public void theMusicStopIsNextMorningOnceItHasPassed() {
-        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,",
-                "\"music\": {\"uri\": \"spotify:playlist:x\", \"until\": \"7:10\"},"));
+        Routine r = Routine.parse(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"7:10\""));
         assertEquals(at(MONDAY.plusDays(1), 7, 10), r.nextMusicStop(at(MONDAY, 7, 10)));
+    }
+
+    @Test
+    public void theRampAddsItsStep() {
+        Routine r = Routine.parse(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"7:10\","
+                + " \"rampEveryMinutes\": 5, \"rampStep\": 10, \"maxVolume\": 60"));
+        assertEquals(25, r.music.raised(15));
+    }
+
+    @Test
+    public void theRampStopsAtTheMaximum() {
+        Routine r = Routine.parse(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"7:10\","
+                + " \"rampStep\": 10, \"maxVolume\": 60"));
+        assertEquals(60, r.music.raised(55));
+    }
+
+    @Test
+    public void theRampNeverTurnsALoudTvDown() {
+        Routine r = Routine.parse(withMusic("\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"7:10\","
+                + " \"maxVolume\": 60"));
+        assertEquals(80, r.music.raised(80));
+    }
+
+    @Test
+    public void aVolumeOverAHundredIsRefused() {
+        assertEquals("\"music\".\"maxVolume\" must be 0 to 100, not 120", refusal(withMusic(
+                "\"uri\": \"spotify:playlist:x\", \"device\": \"TV\", \"until\": \"7:10\", \"maxVolume\": 120")));
+    }
+
+    @Test
+    public void theGreetingNamesTheKid() {
+        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,", "\"greeting\": \"Good morning {name}!\","));
+        assertEquals("Good morning Sam!", r.greet(r.kids.get(0)));
+    }
+
+    @Test
+    public void withNoGreetingTheHeadingIsTheName() {
+        assertEquals("Sam", routine().greet(routine().kids.get(0)));
+    }
+
+    @Test
+    public void aGreetingWithoutTheNameIsRefused() {
+        assertEquals("\"greeting\" must say {name}",
+                refusal(SCHOOL_DAYS.replace("\"showOnWake\": true,", "\"greeting\": \"Hello!\",")));
+    }
+
+    @Test
+    public void theHappySoundNeverClips() {
+        short peak = 0;
+        for (short s : Chime.happy()) peak = (short) Math.max(peak, Math.abs(s));
+        assertTrue(peak < Short.MAX_VALUE * 0.4);
     }
 
     @Test

@@ -28,12 +28,9 @@ public class AlarmReceiver extends BroadcastReceiver {
         } else if (Waker.SLEEP.equals(action)) {
             if (BoardActivity.showing()) SleepService.sleep();
         } else if (Waker.MUSIC_STOP.equals(action)) {
-            try {
-                Routine r = Store.routine(context);
-                if (r != null) Music.stop(context, r);
-            } catch (IllegalArgumentException ignored) {
-                // A stored routine that no longer parses has no music to stop; the board says why.
-            }
+            // The pause is network work: keep the broadcast alive until it is done.
+            PendingResult pending = goAsync();
+            Music.stop(context, pending::finish);
         } else if (Waker.REPORT.equals(action)) {
             // The send is network work: keep the broadcast alive until it is done.
             PendingResult pending = goAsync();

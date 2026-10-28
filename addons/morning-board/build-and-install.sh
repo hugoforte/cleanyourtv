@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Build Morning Board, install it on the TV, push a routine if given one, start the screen watcher and open the board.
-#   TV_HOST=<tv ip> addons/morning-board/build-and-install.sh [routine.json [mail.json]]
+#   TV_HOST=<tv ip> addons/morning-board/build-and-install.sh [routine.json [mail.json [spotify.json]]]
 #   TV_HOST=<tv ip> addons/morning-board/build-and-install.sh --uninstall
-# mail.json is the account the emails go from ({"host", "port", "user", "password"}); keep it out of every repo.
+# mail.json is the account the emails go from ({"host", "port", "user", "password"}); spotify.json the Spotify
+# account the music starts with ({"clientId", "clientSecret", "refreshToken"}). Keep both out of every repo.
 set -euo pipefail
 ROUTINE="${1:-}"
 MAIL="${2:-}"
+SPOTIFY="${3:-}"
 : "${TV_HOST:?set TV_HOST to the TV IP address}"
 absolute() {
   [ -f "$1" ] || { echo "no such file: $1" >&2; exit 1; }
@@ -16,6 +18,7 @@ absolute() {
 }
 if [ -n "$ROUTINE" ] && [ "$ROUTINE" != "--uninstall" ]; then ROUTINE=$(absolute "$ROUTINE"); fi
 if [ -n "$MAIL" ]; then MAIL=$(absolute "$MAIL"); fi
+if [ -n "$SPOTIFY" ]; then SPOTIFY=$(absolute "$SPOTIFY"); fi
 cd "$(dirname "$0")"
 TOOLS="$(cd ../../tools && pwd)"
 PY=$TOOLS/venv/bin/python
@@ -43,10 +46,7 @@ case "$OUT" in *Success*) ;; *) echo "ERROR: pm install failed" >&2; exit 1 ;; e
 # Android 10 and later let an app open a screen from the background only when it may draw over other apps;
 # Android 12 and later withhold exact alarms unless allowed.
 tv "appops set $PKG SYSTEM_ALERT_WINDOW allow; appops set $PKG SCHEDULE_EXACT_ALARM allow 2>/dev/null; true"
-# The media-session access for music: it does nothing unless the routine has music.
-tv "cmd notification allow_listener $PKG/$PKG.MediaListener"
-# The accessibility service, for turnTvOn's standby and the music's Play button: it does nothing unless the routine
-# asks for one. Android binds a service with the capabilities it had when it was turned on, so it is turned off and
+# The accessibility service, for turnTvOn's standby: it does nothing unless the routine asks for it. Android binds a service with the capabilities it had when it was turned on, so it is turned off and
 # on again on every install, as the launcher's own script does.
 tv "s=\$(settings get secure enabled_accessibility_services); case :\$s: in *:$SVC:*) ;; *) if [ -z \$s ] || [ \$s = null ]; then s=$SVC; else s=\$s:$SVC; fi;; esac; settings put secure enabled_accessibility_services ''; sleep 1; settings put secure enabled_accessibility_services \$s; settings put secure accessibility_enabled 1"
 
@@ -60,6 +60,7 @@ push() {
 }
 if [ -n "$ROUTINE" ]; then push "$ROUTINE" routine.json; fi
 if [ -n "$MAIL" ]; then push "$MAIL" mail.json; fi
+if [ -n "$SPOTIFY" ]; then push "$SPOTIFY" spotify.json; fi
 # Starting the watcher once takes the app out of the stopped state, without which Android withholds BOOT_COMPLETED.
 # It stops itself again when the routine does not ask for showOnWake.
 tv "am start-foreground-service -n $PKG/.WatchService"

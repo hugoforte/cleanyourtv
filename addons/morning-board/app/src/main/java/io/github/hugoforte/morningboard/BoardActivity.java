@@ -138,6 +138,7 @@ public class BoardActivity extends Activity {
         Routine routine;
         String problem = Store.problem(this);
         if (problem == null) problem = Store.mailProblem(this);
+        if (problem == null) problem = Store.musicProblem(this);
         try {
             routine = Store.routine(this);
         } catch (IllegalArgumentException e) {
@@ -169,7 +170,7 @@ public class BoardActivity extends Activity {
         chimeOnNewStep(routine, today ? now.toLocalTime() : null);
         Set<String> ticks = Store.ticks(this, day);
         for (int k = 0; k < routine.kids.size(); k++) {
-            columns.addView(column(routine.kids.get(k), k, day, today, now.toLocalTime(), ticks),
+            columns.addView(column(routine, routine.kids.get(k), k, day, today, now.toLocalTime(), ticks),
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         }
         View again = focusTag == null ? null : columns.findViewWithTag(focusTag);
@@ -177,7 +178,8 @@ public class BoardActivity extends Activity {
     }
 
     /** A kid's column, scrolling when its steps are more than the screen holds; focus scrolls it along. */
-    private View column(Routine.Kid kid, int k, LocalDate day, boolean today, LocalTime now, Set<String> ticks) {
+    private View column(Routine routine, Routine.Kid kid, int k, LocalDate day, boolean today, LocalTime now,
+                        Set<String> ticks) {
         ScrollView scroll = new ScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
         LinearLayout col = new LinearLayout(this);
@@ -187,7 +189,7 @@ public class BoardActivity extends Activity {
 
         TextView name = text(26, TEXT);
         name.setTypeface(Typeface.DEFAULT_BOLD);
-        name.setText(kid.name);
+        name.setText(routine.greet(kid));
         col.addView(name);
 
         int done = 0;
@@ -230,6 +232,7 @@ public class BoardActivity extends Activity {
         row.setBackgroundResource(R.drawable.row);
         row.setOnClickListener(v -> {
             Store.toggle(this, day, key);
+            if (Store.ticks(this, day).contains(key)) Chime.playHappy();
             Routine r = Store.routine(this);
             if (r != null) Mail.afterTick(this, r, Integer.parseInt(key.substring(0, key.indexOf(':'))), day);
             build();

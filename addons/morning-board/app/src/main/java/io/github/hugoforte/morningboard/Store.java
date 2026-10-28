@@ -13,14 +13,15 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The routine, the mail account and the day's ticks, in the app's own storage (backups are off). The routine arrives
- * as routine.json and the account as mail.json, pushed by the install script, each read once and deleted; a file
- * that does not parse leaves what was there and says why on the board.
+ * The routine, the mail and Spotify accounts and the day's ticks, in the app's own storage (backups are off). They
+ * arrive as routine.json, mail.json and spotify.json, pushed by the install script, each read once and deleted; a
+ * file that does not parse leaves what was there and says why on the board.
  */
 final class Store {
     static final String ROUTINE = "routine.json";
     static final String MAIL = "mail.json";
-    static final List<String> PUSHED = Arrays.asList(ROUTINE, MAIL);
+    static final String SPOTIFY = "spotify.json";
+    static final List<String> PUSHED = Arrays.asList(ROUTINE, MAIL, SPOTIFY);
 
     private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences("board", Context.MODE_PRIVATE);
@@ -41,6 +42,22 @@ final class Store {
     /** Why the last pushed file was refused, or null when it was taken. */
     static String problem(Context c) {
         return prefs(c).getString("problem", null);
+    }
+
+    /** The Spotify account the morning's music is started with, or null when no spotify.json was pushed. */
+    static Spotify.Account spotify(Context c) {
+        String json = prefs(c).getString("spotify", "");
+        return json.isEmpty() ? null : Spotify.Account.parse(json);
+    }
+
+    /** Why the morning's music did not start, or null when it did. */
+    static String musicProblem(Context c) {
+        return prefs(c).getString("musicProblem", null);
+    }
+
+    static void musicResult(Context c, String problem) {
+        if (problem == null) prefs(c).edit().remove("musicProblem").apply();
+        else prefs(c).edit().putString("musicProblem", problem).apply();
     }
 
     /** Why the last email could not be sent, or null when it went. */
@@ -74,9 +91,12 @@ final class Store {
                     SharedPreferences.Editor e = prefs(c).edit().putString("routine", json).remove("problem").remove("ticks");
                     for (String key : prefs(c).getAll().keySet()) if (key.startsWith("mailed:")) e.remove(key);
                     e.apply();
-                } else {
+                } else if (name.equals(MAIL)) {
                     Mailer.Account.parse(json);
                     prefs(c).edit().putString("mail", json).remove("problem").remove("mailProblem").apply();
+                } else {
+                    Spotify.Account.parse(json);
+                    prefs(c).edit().putString("spotify", json).remove("problem").remove("musicProblem").apply();
                 }
                 Waker.schedule(c);
             } catch (Exception e) {

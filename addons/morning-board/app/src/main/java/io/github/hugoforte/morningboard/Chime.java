@@ -4,7 +4,10 @@ import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
 
-/** A short two-note bell, made here rather than shipped as a file: the sound of a new step coming due. */
+/**
+ * The board's sounds, made here rather than shipped as files: a short two-note bell for a new step coming due (and
+ * each step of the wake-up ramp), and a happy run up a chord for a box ticked.
+ */
 final class Chime {
     private static final int RATE = 44_100;
 
@@ -26,8 +29,32 @@ final class Chime {
         return out;
     }
 
+    /** A happy little run up the major chord, C E G C, for a box ticked. Plain Java, tested. */
+    static short[] happy() {
+        double[] notes = {1046.5, 1318.5, 1568.0, 2093.0};
+        int each = RATE * 12 / 100;
+        int last = RATE * 5 / 10;
+        short[] out = new short[each * (notes.length - 1) + last];
+        for (int n = 0; n < notes.length; n++) {
+            int length = n == notes.length - 1 ? last : each;
+            for (int i = 0; i < length; i++) {
+                double t = (double) i / RATE;
+                double tone = Math.sin(2 * Math.PI * notes[n] * t) + 0.25 * Math.sin(2 * Math.PI * notes[n] * 2 * t);
+                out[n * each + i] = (short) (Math.exp(-6 * t) * tone * 0.35 * Short.MAX_VALUE / 1.25);
+            }
+        }
+        return out;
+    }
+
     static void play() {
-        short[] s = samples();
+        play(samples());
+    }
+
+    static void playHappy() {
+        play(happy());
+    }
+
+    private static void play(short[] s) {
         AudioTrack track = new AudioTrack.Builder()
                 .setAudioAttributes(new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)

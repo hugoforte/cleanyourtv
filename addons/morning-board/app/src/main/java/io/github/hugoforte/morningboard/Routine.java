@@ -68,18 +68,40 @@ final class Routine {
     final Email email;
     /** What plays when the board comes up in the morning, and until when; null for no music. */
     final Music music;
+    /** The heading over each kid's column, with {name} for the kid's name: "Good morning {name}!". */
+    final String greeting;
     final List<Kid> kids;
 
     static final class Music {
         final String uri;
-        /** The package that plays it: Spotify's TV app unless the routine says otherwise. */
+        /** The app opened so its Connect device comes up: Spotify's TV app unless the routine says otherwise. */
         final String app;
+        /** The TV's Spotify Connect device, by the name Spotify shows ("Living Room TV"). */
+        final String device;
         final LocalTime until;
+        /** The TV's volume, in percent, when the music starts; -1 leaves it as it is. */
+        final int startVolume;
+        /** Every this many minutes until someone ticks a step, a ding and the volume up by rampStep; 0 for never. */
+        final int rampEveryMinutes;
+        final int rampStep;
+        /** The ramp never takes the volume above this. */
+        final int maxVolume;
 
-        Music(String uri, String app, LocalTime until) {
+        Music(String uri, String app, String device, LocalTime until, int startVolume, int rampEveryMinutes,
+              int rampStep, int maxVolume) {
             this.uri = uri;
             this.app = app;
+            this.device = device;
             this.until = until;
+            this.startVolume = startVolume;
+            this.rampEveryMinutes = rampEveryMinutes;
+            this.rampStep = rampStep;
+            this.maxVolume = maxVolume;
+        }
+
+        /** The volume after one step of the ramp from current: rampStep higher, but never above maxVolume. */
+        int raised(int current) {
+            return Math.max(current, Math.min(maxVolume, current + rampStep));
         }
     }
 
@@ -94,7 +116,7 @@ final class Routine {
     }
 
     private Routine(Set<DayOfWeek> days, LocalTime from, LocalTime until, LocalTime leave, boolean showOnWake,
-                    boolean turnTvOn, Email email, Music music, List<Kid> kids) {
+                    boolean turnTvOn, Email email, Music music, String greeting, List<Kid> kids) {
         this.days = days;
         this.from = from;
         this.until = until;
@@ -103,6 +125,7 @@ final class Routine {
         this.turnTvOn = turnTvOn;
         this.email = email;
         this.music = music;
+        this.greeting = greeting;
         this.kids = kids;
     }
 
@@ -131,7 +154,9 @@ final class Routine {
             boolean turnTvOn = o.has("turnTvOn") && o.getBoolean("turnTvOn");
             Email email = o.has("email") ? email(o.getJSONObject("email"), from, until, leave) : null;
             Music music = o.has("music") ? music(o.getJSONObject("music"), from, until) : null;
-            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, music,
+            String greeting = o.optString("greeting", "{name}");
+            if (!greeting.contains("{name}")) throw new IllegalArgumentException("\"greeting\" must say {name}");
+            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, music, greeting,
                     Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
@@ -195,11 +220,26 @@ final class Routine {
         String uri = o.getString("uri").trim();
         if (!uri.matches("[a-z][a-z0-9+.-]*:\\S+")) throw new IllegalArgumentException("\"music\".\"uri\" is not a URI: \"" + uri + "\"");
         String app = o.optString("app", "com.spotify.tv.android").trim();
+        String device = o.getString("device").trim();
+        if (device.isEmpty()) throw new IllegalArgumentException("\"music\".\"device\" names no Spotify Connect device");
         LocalTime stop = time(o, "until");
         if (!stop.isAfter(from) || stop.isAfter(until)) {
             throw new IllegalArgumentException("\"music\".\"until\" must be after \"from\" and no later than \"until\"");
         }
-        return new Music(uri, app, stop);
+        int start = volume(o, "startVolume", -1);
+        int max = volume(o, "maxVolume", 60);
+        int step = volume(o, "rampStep", 10);
+        int every = o.optInt("rampEveryMinutes", 0);
+        if (every < 0) throw new IllegalArgumentException("\"music\".\"rampEveryMinutes\" cannot be negative");
+        return new Music(uri, app, device, stop, start, every, step, max);
+    }
+
+    /** A volume in percent, 0 to 100; absent gives the default. */
+    private static int volume(JSONObject o, String key, int absent) throws JSONException {
+        if (!o.has(key)) return absent;
+        int v = o.getInt(key);
+        if (v < 0 || v > 100) throw new IllegalArgumentException("\"music\".\"" + key + "\" must be 0 to 100, not " + v);
+        return v;
     }
 
     private static DayOfWeek day(String name) {
@@ -232,6 +272,11 @@ final class Routine {
             day = day.plusDays(1);
         } while (!days.contains(day.getDayOfWeek()));
         return day;
+    }
+
+    /** The heading over a kid's column. */
+    String greet(Kid kid) {
+        return greeting.replace("{name}", kid.name);
     }
 
     /** The next time after t that the window opens: when turnTvOn switches the TV on. */
