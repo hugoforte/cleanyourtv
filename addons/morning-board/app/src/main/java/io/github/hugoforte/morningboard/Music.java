@@ -108,7 +108,7 @@ final class Music {
             LocalDateTime now = LocalDateTime.now();
             if (r == null || r.music == null || r.music.rampEveryMinutes <= 0 || !r.inWindow(now)
                     || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, now.toLocalDate()).isEmpty()
-                    || off(app)) {
+                    || Store.marked(app, now.toLocalDate(), "rampOver")) {
                 return;
             }
             Chime.play();
@@ -160,15 +160,38 @@ final class Music {
         }
     }
 
-    /** Whether the board's Stop music button was pressed this morning. */
+    /** Whether the board's music button has stopped the music this morning. */
     static boolean off(Context c) {
         return Store.marked(c, LocalDateTime.now().toLocalDate(), "musicOff");
     }
 
-    /** The board's Stop music button: pause it, and no more ramp this morning. */
-    static void turnOff(Context c) {
-        Store.firstTime(c, LocalDateTime.now().toLocalDate(), "musicOff");
-        stop(c, () -> { });
+    /**
+     * The board's music button. Stop pauses it, and the volume ramp ends for the morning; Play carries on with the
+     * playlist on the routine's device, at the volume it had.
+     */
+    static void toggle(Context c, Routine r) {
+        Context app = c.getApplicationContext();
+        boolean nowOff = !off(app);
+        Store.mark(app, LocalDateTime.now().toLocalDate(), "musicOff", nowOff);
+        Store.mark(app, LocalDateTime.now().toLocalDate(), "rampOver", true);
+        if (nowOff) {
+            stop(app, () -> { });
+            return;
+        }
+        NET.execute(() -> {
+            try {
+                Spotify.Account account = Store.spotify(app);
+                if (account == null) throw new IllegalStateException("no spotify.json was pushed, so no music can start");
+                Spotify spotify = new Spotify(account);
+                String device = spotify.device(r.music.device);
+                if (device == null) throw new IllegalStateException("Spotify does not show \"" + r.music.device + "\"");
+                spotify.resume(device);
+                Store.musicResult(app, null);
+            } catch (Exception e) {
+                Log.w(TAG, "morning music not played again", e);
+                Store.musicResult(app, "Music not played: " + e.getMessage());
+            }
+        });
     }
 
     /** Pauses the account's playback, at music.until. done runs once that has been asked. */

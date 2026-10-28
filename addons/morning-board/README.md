@@ -43,6 +43,7 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 | `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out. **Not on a Sony BRAVIA**: there an app's wake from deep standby turns Android on but leaves the panel dark, so a press of the power button then turns the TV off; use the TV's own on-timer instead (below) |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
 | `email` | Optional: `to` (a list of addresses) and `reportAt` (inside the window; `leave` when left out). An email goes to them once a kid ticks every step inside the window, and at `reportAt` one listing what is still unticked, if anything. Needs a `mail.json` (below) |
+| `weather` | Optional: `latitude`, `longitude` and `unit` (`C` or `F`). The temperature now and today's low and high show under the countdown, from [Open-Meteo](https://open-meteo.com) (no key), read every 15 minutes |
 | `greeting` | Optional: the heading a kid's column gets once every step is ticked, in place of the name, with `{name}`, e.g. `"Good morning {name}! I love you ♥"`. The name alone when left out |
 | `music` | Optional: `uri` (a `spotify:playlist:…`), `device` (the TV's Spotify Connect name, e.g. `"Living Room TV"`), `until` (when it pauses), and for a wake-up ramp `startVolume`, `rampEveryMinutes`, `rampStep` and `maxVolume` (percent; 60 when left out). Needs a `spotify.json` (below) |
 
@@ -52,8 +53,8 @@ ticked.
 With `music`, once a morning when the screen comes on inside the window, the board opens Spotify on the TV, waits for
 its Connect device, and starts the playlist through Spotify's Web API (Spotify's TV app will not start a playlist for
 another app on the TV itself), then sets `startVolume`. Every `rampEveryMinutes` it chimes and turns the TV up by
-`rampStep`, never past `maxVolume`, until anyone ticks a box. A **Stop music** button under the columns pauses it
-and ends the ramp for that morning. The volume is stepped one notch at a time, because a
+`rampStep`, never past `maxVolume`, until anyone ticks a box. A music button under the columns toggles it: **Stop
+music** pauses it and ends the ramp for that morning, **Play music** carries on with the playlist. The volume is stepped one notch at a time, because a
 Sony BRAVIA moves a single step for each change it is asked for. `spotify.json` is the account it plays on, which
 needs Spotify Premium: `{"clientId", "clientSecret", "refreshToken"}`, from a
 [Spotify developer app](https://developer.spotify.com/dashboard) and one sign-in with the scopes
@@ -99,7 +100,7 @@ Run it again with a new routine to change it; `--uninstall` (`-Uninstall`) remov
 | Accessibility service (`SleepService`) | Only for `turnTvOn`'s standby at the end of the window: the "lock screen" action, which on Android 9 and later puts the TV to sleep, as Sleep Timer's does. It asks for no events and reads nothing on screen. The install script enables it. |
 | `SYSTEM_ALERT_WINDOW` | Android 10 and later let an app open its screen from the background only with it; the install script grants it. Not needed on Android 9. |
 
-| `INTERNET` | Only for `email` and `music`: the mail server in `mail.json` and Spotify's Web API, and nothing else. |
+| `INTERNET` | Only for `email`, `music` and `weather`: the mail server in `mail.json`, Spotify's Web API and Open-Meteo, and nothing else. |
 
 No accounts beyond your own mail server, no telemetry, no libraries. The routine and the ticks stay in the app's own storage (backups are off).
 `ConfigProvider` takes a pushed file and answers whether it was taken, and only the ADB shell can use it (it requires

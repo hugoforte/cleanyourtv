@@ -66,6 +66,11 @@ final class Spotify {
         call("PUT", "/me/player/play?device_id=" + deviceId, "{\"context_uri\":" + JSONObject.quote(contextUri) + "}");
     }
 
+    /** Carries on with what was paused on that device. */
+    void resume(String deviceId) throws IOException {
+        call("PUT", "/me/player/play?device_id=" + deviceId, null);
+    }
+
     void pause() throws IOException {
         call("PUT", "/me/player/pause", null);
     }

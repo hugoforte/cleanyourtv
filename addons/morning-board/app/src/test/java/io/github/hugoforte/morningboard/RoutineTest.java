@@ -312,6 +312,19 @@ public class RoutineTest {
     }
 
     @Test
+    public void theWeatherPlaceIsRead() {
+        Routine r = Routine.parse(SCHOOL_DAYS.replace("\"showOnWake\": true,",
+                "\"weather\": {\"latitude\": 41.9028, \"longitude\": -87.6837, \"unit\": \"F\"},"));
+        assertTrue(r.weather.fahrenheit);
+    }
+
+    @Test
+    public void aWeatherUnitThatIsNotCOrFIsRefused() {
+        assertEquals("\"weather\".\"unit\" is C or F", refusal(SCHOOL_DAYS.replace("\"showOnWake\": true,",
+                "\"weather\": {\"latitude\": 41.9, \"longitude\": -87.7, \"unit\": \"K\"},")));
+    }
+
+    @Test
     public void theHappySoundNeverClips() {
         short peak = 0;
         for (short s : Chime.happy()) peak = (short) Math.max(peak, Math.abs(s));

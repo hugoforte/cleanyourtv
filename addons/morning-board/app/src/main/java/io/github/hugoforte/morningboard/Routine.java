@@ -70,7 +70,21 @@ final class Routine {
     final Music music;
     /** The heading over a kid's column once every step is ticked, with {name} for the kid's name: "Good morning {name}!". */
     final String greeting;
+    /** Where the board's temperature line is for; null for none. */
+    final Place weather;
     final List<Kid> kids;
+
+    static final class Place {
+        final double latitude;
+        final double longitude;
+        final boolean fahrenheit;
+
+        Place(double latitude, double longitude, boolean fahrenheit) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.fahrenheit = fahrenheit;
+        }
+    }
 
     static final class Music {
         final String uri;
@@ -116,7 +130,7 @@ final class Routine {
     }
 
     private Routine(Set<DayOfWeek> days, LocalTime from, LocalTime until, LocalTime leave, boolean showOnWake,
-                    boolean turnTvOn, Email email, Music music, String greeting, List<Kid> kids) {
+                    boolean turnTvOn, Email email, Music music, String greeting, Place weather, List<Kid> kids) {
         this.days = days;
         this.from = from;
         this.until = until;
@@ -126,6 +140,7 @@ final class Routine {
         this.email = email;
         this.music = music;
         this.greeting = greeting;
+        this.weather = weather;
         this.kids = kids;
     }
 
@@ -156,7 +171,8 @@ final class Routine {
             Music music = o.has("music") ? music(o.getJSONObject("music"), from, until) : null;
             String greeting = o.optString("greeting", "{name}");
             if (!greeting.contains("{name}")) throw new IllegalArgumentException("\"greeting\" must say {name}");
-            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, music, greeting,
+            Place weather = o.has("weather") ? place(o.getJSONObject("weather")) : null;
+            return new Routine(days, from, until, leave, showOnWake, turnTvOn, email, music, greeting, weather,
                     Collections.unmodifiableList(kids));
         } catch (JSONException e) {
             throw new IllegalArgumentException(e.getMessage(), e);
@@ -214,6 +230,17 @@ final class Routine {
             throw new IllegalArgumentException("\"email\".\"reportAt\" must be from \"from\" to before \"until\"");
         }
         return new Email(Collections.unmodifiableList(to), reportAt);
+    }
+
+    private static Place place(JSONObject o) throws JSONException {
+        double latitude = o.getDouble("latitude");
+        double longitude = o.getDouble("longitude");
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            throw new IllegalArgumentException("\"weather\" has no place on Earth: " + latitude + ", " + longitude);
+        }
+        String unit = o.optString("unit", "C").trim().toUpperCase(Locale.ROOT);
+        if (!unit.equals("C") && !unit.equals("F")) throw new IllegalArgumentException("\"weather\".\"unit\" is C or F");
+        return new Place(latitude, longitude, unit.equals("F"));
     }
 
     private static Music music(JSONObject o, LocalTime from, LocalTime until) throws JSONException {

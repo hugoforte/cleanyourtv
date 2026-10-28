@@ -7,7 +7,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,6 +25,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The tile and module card open this, and so does the screen turning on in the morning with showOnWake. A clock and
@@ -43,6 +47,7 @@ public class BoardActivity extends Activity {
     private TextView date;
     private LinearLayout columns;
     private TextView musicButton;
+    private TextView weatherLine;
     private DateTimeFormatter time;
     private final Runnable refresh = new Runnable() {
         @Override
@@ -73,9 +78,16 @@ public class BoardActivity extends Activity {
         top.setGravity(Gravity.CENTER_VERTICAL);
         clock = text(48, TEXT);
         top.addView(clock, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setGravity(Gravity.END);
         leave = text(30, NOW);
         leave.setGravity(Gravity.END);
-        top.addView(leave);
+        right.addView(leave);
+        weatherLine = text(24, TEXT);
+        weatherLine.setGravity(Gravity.END);
+        right.addView(weatherLine);
+        top.addView(right);
         page.addView(top);
         date = text(18, MUTED);
         date.setPadding(0, 0, 0, px(12));
@@ -88,7 +100,8 @@ public class BoardActivity extends Activity {
         musicButton.setPadding(px(16), px(8), px(16), px(8));
         musicButton.setBackgroundResource(R.drawable.row);
         musicButton.setOnClickListener(v -> {
-            Music.turnOff(this);
+            Routine r = Store.routine(this);
+            if (r != null && r.music != null) Music.toggle(this, r);
             build();
         });
         page.addView(musicButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -188,6 +201,7 @@ public class BoardActivity extends Activity {
         View again = focusTag == null ? null : columns.findViewWithTag(focusTag);
         if (again != null) again.requestFocus();
         showMusicButton(routine, today, now.toLocalTime());
+        showWeather(routine);
     }
 
     /** "Stop music" while the morning's music may be playing; "Music off" once pressed; nothing otherwise. */
@@ -196,9 +210,39 @@ public class BoardActivity extends Activity {
         musicButton.setVisibility(playing ? View.VISIBLE : View.GONE);
         if (!playing) return;
         boolean off = Music.off(this);
-        musicButton.setText(off ? "Music off" : "■  Stop music");
-        musicButton.setTextColor(off ? MUTED : TEXT);
-        musicButton.setFocusable(!off);
+        musicButton.setText(off ? "▶  Play music" : "■  Stop music");
+        musicButton.setFocusable(true);
+    }
+
+    /** The last temperature read, and when; the board asks again at most every Weather.REFRESH_MS. */
+    private Weather weather;
+    private long weatherAt;
+    private final ExecutorService net = Executors.newSingleThreadExecutor();
+
+    /** Now, and today's low and high, under the countdown; nothing without a weather block or before a first answer. */
+    private void showWeather(Routine routine) {
+        if (routine.weather == null) {
+            weatherLine.setText("");
+            return;
+        }
+        weatherLine.setText(weather == null ? "" : weather.line());
+        long now = SystemClock.elapsedRealtime();
+        if (weatherAt != 0 && now - weatherAt < Weather.REFRESH_MS) return;
+        weatherAt = now;
+        Routine.Place place = routine.weather;
+        net.execute(() -> {
+            try {
+                Weather w = Weather.fetch(place);
+                main.post(() -> {
+                    weather = w;
+                    weatherLine.setText(w.line());
+                });
+            } catch (Exception e) {
+                Log.w("MorningBoard", "no weather", e);
+                // Asked again sooner than the refresh: a minute on, on the next rebuild after it.
+                weatherAt = now - Weather.REFRESH_MS + 60_000L;
+            }
+        });
     }
 
     /** A kid's column, scrolling when its steps are more than the screen holds; focus scrolls it along. */
