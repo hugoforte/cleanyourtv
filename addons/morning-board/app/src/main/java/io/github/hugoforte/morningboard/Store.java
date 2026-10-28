@@ -121,6 +121,11 @@ final class Store {
         prefs(c).edit().putString("ticksDay", day.toString()).putStringSet("ticks", ticks).apply();
     }
 
+    /** Whether firstTime has already recorded what for that day. */
+    static boolean marked(Context c, LocalDate day, String what) {
+        return prefs(c).getBoolean("mailed:" + day + ":" + what, false);
+    }
+
     /** Records that something was emailed for that day and key, once: false when it already was. */
     static synchronized boolean firstTime(Context c, LocalDate day, String what) {
         String key = "mailed:" + day + ":" + what;

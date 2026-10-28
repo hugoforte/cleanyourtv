@@ -107,7 +107,8 @@ final class Music {
             }
             LocalDateTime now = LocalDateTime.now();
             if (r == null || r.music == null || r.music.rampEveryMinutes <= 0 || !r.inWindow(now)
-                    || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, now.toLocalDate()).isEmpty()) {
+                    || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, now.toLocalDate()).isEmpty()
+                    || off(app)) {
                 return;
             }
             Chime.play();
@@ -157,6 +158,17 @@ final class Music {
                 SystemClock.sleep(3_000);
             }
         }
+    }
+
+    /** Whether the board's Stop music button was pressed this morning. */
+    static boolean off(Context c) {
+        return Store.marked(c, LocalDateTime.now().toLocalDate(), "musicOff");
+    }
+
+    /** The board's Stop music button: pause it, and no more ramp this morning. */
+    static void turnOff(Context c) {
+        Store.firstTime(c, LocalDateTime.now().toLocalDate(), "musicOff");
+        stop(c, () -> { });
     }
 
     /** Pauses the account's playback, at music.until. done runs once that has been asked. */

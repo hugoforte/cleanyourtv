@@ -52,7 +52,8 @@ ticked.
 With `music`, once a morning when the screen comes on inside the window, the board opens Spotify on the TV, waits for
 its Connect device, and starts the playlist through Spotify's Web API (Spotify's TV app will not start a playlist for
 another app on the TV itself), then sets `startVolume`. Every `rampEveryMinutes` it chimes and turns the TV up by
-`rampStep`, never past `maxVolume`, until anyone ticks a box. The volume is stepped one notch at a time, because a
+`rampStep`, never past `maxVolume`, until anyone ticks a box. A **Stop music** button under the columns pauses it
+and ends the ramp for that morning. The volume is stepped one notch at a time, because a
 Sony BRAVIA moves a single step for each change it is asked for. `spotify.json` is the account it plays on, which
 needs Spotify Premium: `{"clientId", "clientSecret", "refreshToken"}`, from a
 [Spotify developer app](https://developer.spotify.com/dashboard) and one sign-in with the scopes

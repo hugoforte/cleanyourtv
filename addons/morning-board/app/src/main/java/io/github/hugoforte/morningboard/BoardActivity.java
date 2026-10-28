@@ -42,6 +42,7 @@ public class BoardActivity extends Activity {
     private TextView leave;
     private TextView date;
     private LinearLayout columns;
+    private TextView musicButton;
     private DateTimeFormatter time;
     private final Runnable refresh = new Runnable() {
         @Override
@@ -82,6 +83,16 @@ public class BoardActivity extends Activity {
 
         columns = new LinearLayout(this);
         page.addView(columns, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        // Below the columns, so ▼ from any step reaches it; shown only while the morning's music can play.
+        musicButton = text(20, TEXT);
+        musicButton.setPadding(px(16), px(8), px(16), px(8));
+        musicButton.setBackgroundResource(R.drawable.row);
+        musicButton.setOnClickListener(v -> {
+            Music.turnOff(this);
+            build();
+        });
+        page.addView(musicButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(page);
     }
 
@@ -151,6 +162,7 @@ public class BoardActivity extends Activity {
                     : "No routine yet. Push a routine.json with the install script; see the add-on's README.");
             if (routine == null) {
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                musicButton.setVisibility(View.GONE);
                 return;
             }
         }
@@ -175,6 +187,18 @@ public class BoardActivity extends Activity {
         }
         View again = focusTag == null ? null : columns.findViewWithTag(focusTag);
         if (again != null) again.requestFocus();
+        showMusicButton(routine, today, now.toLocalTime());
+    }
+
+    /** "Stop music" while the morning's music may be playing; "Music off" once pressed; nothing otherwise. */
+    private void showMusicButton(Routine routine, boolean today, LocalTime now) {
+        boolean playing = routine.music != null && today && now.isBefore(routine.music.until);
+        musicButton.setVisibility(playing ? View.VISIBLE : View.GONE);
+        if (!playing) return;
+        boolean off = Music.off(this);
+        musicButton.setText(off ? "Music off" : "■  Stop music");
+        musicButton.setTextColor(off ? MUTED : TEXT);
+        musicButton.setFocusable(!off);
     }
 
     /** A kid's column, scrolling when its steps are more than the screen holds; focus scrolls it along. */
