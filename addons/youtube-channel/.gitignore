@@ -1,0 +1,6 @@
+.gradle/
+build/
+app/build/
+local.properties
+# Written by build-and-install for one channel: its name, its ID and its picture.
+app/src/channel/

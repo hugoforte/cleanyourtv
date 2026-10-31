@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app_name and channel_id are the channel's, written by build-and-install into src/channel/res. -->
+    <string name="checking">Is %1$s live?…</string>
+    <string name="not_live">%1$s isn\'t live right now. Pick a past show:</string>
+</resources>
