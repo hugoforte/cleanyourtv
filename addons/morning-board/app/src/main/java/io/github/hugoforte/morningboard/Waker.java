@@ -25,30 +25,27 @@ final class Waker {
     private Waker() {
     }
 
+    /** Each alarm at the soonest time any session asks for it; the receiver acts for the session in play then. */
     static void schedule(Context c) {
-        Routine r;
+        Schedule s;
         try {
-            r = Store.routine(c);
+            s = Store.schedule(c);
         } catch (IllegalArgumentException e) {
-            r = null;
+            s = null;
         }
         AlarmManager am = c.getSystemService(AlarmManager.class);
-        PendingIntent wake = alarm(c, WAKE);
-        PendingIntent sleep = alarm(c, SLEEP);
-        PendingIntent report = alarm(c, REPORT);
         LocalDateTime now = LocalDateTime.now();
-        if (r == null || !r.turnTvOn) {
-            am.cancel(wake);
-            am.cancel(sleep);
-        } else {
-            set(am, r.nextFrom(now), wake);
-            set(am, r.nextUntil(now), sleep);
-        }
-        if (r == null || r.email == null) am.cancel(report);
-        else set(am, r.nextReport(now), report);
-        PendingIntent musicStop = alarm(c, MUSIC_STOP);
-        if (r == null || r.music == null) am.cancel(musicStop);
-        else set(am, r.nextMusicStop(now), musicStop);
+        set(am, c, WAKE, s == null ? null : s.soonest(r -> r.turnTvOn ? r.nextFrom(now) : null));
+        set(am, c, SLEEP, s == null ? null : s.soonest(r -> r.turnTvOn ? r.nextUntil(now) : null));
+        set(am, c, REPORT, s == null ? null : s.soonest(r -> r.email != null ? r.nextReport(now) : null));
+        set(am, c, MUSIC_STOP, s == null ? null : s.soonest(r -> r.music != null ? r.nextMusicStop(now) : null));
+    }
+
+    /** Sets the alarm for action at at, or cancels it when at is null. */
+    private static void set(AlarmManager am, Context c, String action, LocalDateTime at) {
+        PendingIntent pi = alarm(c, action);
+        if (at == null) am.cancel(pi);
+        else set(am, at, pi);
     }
 
     private static PendingIntent alarm(Context c, String action) {

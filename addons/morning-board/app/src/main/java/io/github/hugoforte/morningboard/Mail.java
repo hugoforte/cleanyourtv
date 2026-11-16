@@ -11,7 +11,7 @@ import java.util.concurrent.Executors;
 
 /**
  * When the emails go: once a kid ticks everything inside the window, and at the report time if anything is still
- * unticked. Each goes once a morning. Sending happens off the main thread; a failure is kept for the board to show.
+ * unticked. Each goes once a session. Sending happens off the main thread; a failure is kept for the board to show.
  */
 final class Mail {
     private static final String TAG = "MorningBoard";
@@ -25,8 +25,8 @@ final class Mail {
         LocalDateTime now = LocalDateTime.now();
         if (r.email == null || !r.inWindow(now) || !day.equals(now.toLocalDate())) return;
         Routine.Kid kid = r.kids.get(k);
-        if (!Report.allDone(kid, k, Store.ticks(c, day)) || !Store.firstTime(c, day, "done:" + k)) return;
-        send(c, r, Report.finished(kid, now.toLocalTime()), null);
+        if (!Report.allDone(kid, k, Store.ticks(c, r, day)) || !Store.firstTime(c, r, day, "done:" + k)) return;
+        send(c, r, Report.finished(r, kid, now.toLocalTime()), null);
     }
 
     /** At the report time: what is still unticked, if anything. done runs once the send has finished. */
@@ -43,9 +43,9 @@ final class Mail {
             done.run();
             return;
         }
-        Set<String> ticks = Store.ticks(c, now.toLocalDate());
+        Set<String> ticks = Store.ticks(c, r, now.toLocalDate());
         Report.Message m = Report.unticked(r, ticks);
-        if (m == null || !Store.firstTime(c, now.toLocalDate(), "report")) {
+        if (m == null || !Store.firstTime(c, r, now.toLocalDate(), "report")) {
             done.run();
             return;
         }

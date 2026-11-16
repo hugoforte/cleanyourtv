@@ -23,12 +23,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The morning routine from the pushed routine.json: which days it runs, its window, when everyone leaves, and each
- * kid's steps and day-by-day extras. Plain Java, so the schedule is tested on the JVM.
+ * One session of the pushed routine.json, a school morning or an afternoon: which days it runs, its window, when
+ * everyone leaves, and each kid's steps and day-by-day extras. Schedule holds the sessions. Plain Java, so the
+ * schedule is tested on the JVM.
  */
 final class Routine {
     static final int MAX_KIDS = 4;
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("H:mm");
+    static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("H:mm");
 
     static final class Step {
         final LocalTime at;
@@ -60,6 +61,7 @@ final class Routine {
     final Set<DayOfWeek> days;
     final LocalTime from;
     final LocalTime until;
+    /** When everyone leaves, which the countdown runs to; null for a session with nowhere to go, and no countdown. */
     final LocalTime leave;
     final boolean showOnWake;
     /** Switch the TV on at "from" on the days it runs, and back to standby at "until" if the board is still up. */
@@ -144,19 +146,26 @@ final class Routine {
         this.kids = kids;
     }
 
-    /** Reads routine.json; the message of what it throws says which field is wrong, for the board to show. */
+    /** Reads one session; the message of what it throws says which field is wrong, for the board to show. */
     static Routine parse(String json) {
         try {
-            JSONObject o = new JSONObject(json);
+            return parse(new JSONObject(json));
+        } catch (JSONException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
+    }
+
+    static Routine parse(JSONObject o) {
+        try {
             Set<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
             JSONArray d = o.getJSONArray("days");
             for (int i = 0; i < d.length(); i++) days.add(day(d.getString(i)));
             if (days.isEmpty()) throw new IllegalArgumentException("\"days\" names no day");
             LocalTime from = time(o, "from");
             LocalTime until = time(o, "until");
-            LocalTime leave = time(o, "leave");
+            LocalTime leave = o.has("leave") ? time(o, "leave") : null;
             if (!from.isBefore(until)) throw new IllegalArgumentException("\"from\" must be before \"until\"");
-            if (leave.isBefore(from) || leave.isAfter(until)) {
+            if (leave != null && (leave.isBefore(from) || leave.isAfter(until))) {
                 throw new IllegalArgumentException("\"leave\" must be between \"from\" and \"until\"");
             }
             JSONArray k = o.getJSONArray("kids");
@@ -225,6 +234,9 @@ final class Routine {
             to.add(address);
         }
         if (to.isEmpty()) throw new IllegalArgumentException("\"email\".\"to\" names nobody");
+        if (!o.has("reportAt") && leave == null) {
+            throw new IllegalArgumentException("\"email\".\"reportAt\" is needed when there is no \"leave\"");
+        }
         LocalTime reportAt = o.has("reportAt") ? time(o, "reportAt") : leave;
         if (reportAt.isBefore(from) || !reportAt.isBefore(until)) {
             throw new IllegalArgumentException("\"email\".\"reportAt\" must be from \"from\" to before \"until\"");
@@ -306,6 +318,25 @@ final class Routine {
         return greeting.replace("{name}", kid.name);
     }
 
+    /** What ticks and once-a-day marks are kept under, so two sessions on one day keep theirs apart. */
+    String id() {
+        return from.format(TIME);
+    }
+
+    /** What the board and the emails call the session, by when it starts: "morning", "afternoon" or "evening". */
+    String part() {
+        if (from.isBefore(LocalTime.NOON)) return "morning";
+        return from.isBefore(LocalTime.of(17, 0)) ? "afternoon" : "evening";
+    }
+
+    /** Whether this session and other run at the same time on a day both run. */
+    boolean overlaps(Routine other) {
+        for (DayOfWeek d : days) {
+            if (other.days.contains(d)) return from.isBefore(other.until) && other.from.isBefore(until);
+        }
+        return false;
+    }
+
     /** The next time after t that the window opens: when turnTvOn switches the TV on. */
     LocalDateTime nextFrom(LocalDateTime t) {
         return next(t, from);
@@ -341,7 +372,10 @@ final class Routine {
         return now;
     }
 
-    /** Whole minutes left before leaving, rounded up so "1 min" lasts until the minute is over; 0 or less once it is time. */
+    /**
+     * Whole minutes left before leaving, rounded up so "1 min" lasts until the minute is over; 0 or less once it is
+     * time. Only for a session with a leave time.
+     */
     long minutesToLeave(LocalTime t) {
         long seconds = Duration.between(t, leave).getSeconds();
         return seconds <= 0 ? seconds / 60 : (seconds + 59) / 60;
