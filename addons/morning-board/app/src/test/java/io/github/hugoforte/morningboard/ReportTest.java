@@ -38,7 +38,16 @@ public class ReportTest {
 
     @Test
     public void theFinishedEmailSaysWhoAndWhen() {
-        assertEquals("Axel finished the morning at 7:41 AM", Report.finished(ROUTINE.kids.get(0), LocalTime.of(7, 41)).subject);
+        assertEquals("Axel finished the morning at 7:41 AM",
+                Report.finished(ROUTINE, ROUTINE.kids.get(0), LocalTime.of(7, 41)).subject);
+    }
+
+    @Test
+    public void anAfternoonsFinishedEmailSaysAfternoon() {
+        Routine afternoon = Routine.parse("{\"days\": [\"MON\"], \"from\": \"16:00\", \"until\": \"17:00\","
+                + "\"kids\": [{\"name\": \"Axel\", \"steps\": [{\"at\": \"16:00\", \"do\": \"Load the dishwasher\"}]}]}");
+        assertEquals("Axel finished the afternoon at 4:12 PM",
+                Report.finished(afternoon, afternoon.kids.get(0), LocalTime.of(16, 12)).subject);
     }
 
     @Test

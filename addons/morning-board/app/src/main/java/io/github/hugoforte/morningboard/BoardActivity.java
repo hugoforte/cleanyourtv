@@ -29,9 +29,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * The tile and module card open this, and so does the screen turning on in the morning with showOnWake. A clock and
- * how long until leaving, then a column per kid with the morning's steps: the one under way is highlighted, and OK
- * ticks a step off. Outside the window it shows the next morning's plan, whose steps can be ticked ahead.
+ * The tile and module card open this, and so does the screen turning on in a session's window with showOnWake. A
+ * clock and how long until leaving, then a column per kid with the session's steps: the one under way is highlighted,
+ * and OK ticks a step off. Outside every window it shows the next session's plan, whose steps can be ticked ahead.
  */
 public class BoardActivity extends Activity {
     private static final long REFRESH_MS = 15_000;
@@ -187,13 +187,14 @@ public class BoardActivity extends Activity {
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (problem == null) {
             date.setText(today ? now.toLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
-                    : "Next morning: " + day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)));
+                    : "Next " + routine.part() + ": " + day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)));
         }
-        leave.setText(today ? Routine.leaveText(routine.minutesToLeave(now.toLocalTime()))
-                : "From " + routine.from.format(time));
+        if (!today) leave.setText("From " + routine.from.format(time));
+        else if (routine.leave == null) leave.setText("Until " + routine.until.format(time));
+        else leave.setText(Routine.leaveText(routine.minutesToLeave(now.toLocalTime())));
 
         chimeOnNewStep(routine, today ? now.toLocalTime() : null);
-        Set<String> ticks = Store.ticks(this, day);
+        Set<String> ticks = Store.ticks(this, routine, day);
         for (int k = 0; k < routine.kids.size(); k++) {
             columns.addView(column(routine, routine.kids.get(k), k, day, today, now.toLocalTime(), ticks),
                     new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
@@ -209,7 +210,7 @@ public class BoardActivity extends Activity {
         boolean playing = routine.music != null && today && now.isBefore(routine.music.until);
         musicButton.setVisibility(playing ? View.VISIBLE : View.GONE);
         if (!playing) return;
-        boolean off = Music.off(this);
+        boolean off = Music.off(this, routine);
         musicButton.setText(off ? "▶  Play music" : "■  Stop music");
         musicButton.setFocusable(true);
     }
@@ -270,7 +271,7 @@ public class BoardActivity extends Activity {
 
         int current = today ? Routine.current(kid, now) : -1;
         for (int s = 0; s < kid.steps.size(); s++) {
-            col.addView(step(kid.steps.get(s), k + ":" + s, day, ticks.contains(k + ":" + s), s == current,
+            col.addView(step(routine, kid.steps.get(s), k + ":" + s, day, ticks.contains(k + ":" + s), s == current,
                     today && s < current));
         }
 
@@ -284,8 +285,9 @@ public class BoardActivity extends Activity {
         return scroll;
     }
 
-    /** A step with its box: OK ticks it for the morning shown, so a bag packed the night before can be ticked then. */
-    private TextView step(Routine.Step step, String key, LocalDate day, boolean ticked, boolean current, boolean past) {
+    /** A step with its box: OK ticks it for the session shown, so a bag packed the night before can be ticked then. */
+    private TextView step(Routine routine, Routine.Step step, String key, LocalDate day, boolean ticked,
+                          boolean current, boolean past) {
         TextView row = text(20, ticked ? DONE : current ? NOW : past ? MUTED : TEXT);
         row.setText(step.at.format(time) + "   " + step.what);
         row.setCompoundDrawablesRelativeWithIntrinsicBounds(ticked ? R.drawable.box_on : R.drawable.box_off, 0, 0, 0);
@@ -300,10 +302,9 @@ public class BoardActivity extends Activity {
         row.setFocusable(true);
         row.setBackgroundResource(R.drawable.row);
         row.setOnClickListener(v -> {
-            Store.toggle(this, day, key);
-            if (Store.ticks(this, day).contains(key)) Chime.playHappy();
-            Routine r = Store.routine(this);
-            if (r != null) Mail.afterTick(this, r, Integer.parseInt(key.substring(0, key.indexOf(':'))), day);
+            Store.toggle(this, routine, day, key);
+            if (Store.ticks(this, routine, day).contains(key)) Chime.playHappy();
+            Mail.afterTick(this, routine, Integer.parseInt(key.substring(0, key.indexOf(':'))), day);
             build();
         });
         return row;

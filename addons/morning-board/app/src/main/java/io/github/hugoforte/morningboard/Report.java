@@ -29,9 +29,10 @@ final class Report {
         return true;
     }
 
-    static Message finished(Routine.Kid kid, LocalTime at) {
-        return new Message(kid.name + " finished the morning at " + at.format(TIME),
-                kid.name + " ticked off all " + kid.steps.size() + " steps on the morning board by " + at.format(TIME) + ".\n");
+    static Message finished(Routine session, Routine.Kid kid, LocalTime at) {
+        return new Message(kid.name + " finished the " + session.part() + " at " + at.format(TIME),
+                kid.name + " ticked off all " + kid.steps.size() + " steps on the " + session.part() + "'s board by "
+                        + at.format(TIME) + ".\n");
     }
 
     /** What is still unticked, by kid; null when everything is done. */

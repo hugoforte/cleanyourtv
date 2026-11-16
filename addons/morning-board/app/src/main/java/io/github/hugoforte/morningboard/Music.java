@@ -48,7 +48,7 @@ final class Music {
     static void morning(Context c, Routine r) {
         LocalDateTime now = LocalDateTime.now();
         if (r.music == null || !r.inWindow(now) || !now.toLocalTime().isBefore(r.music.until)) return;
-        if (!Store.firstTime(c, now.toLocalDate(), "music")) return;
+        if (!Store.firstTime(c, r, now.toLocalDate(), "music")) return;
         Context app = c.getApplicationContext();
         startingUntil = SystemClock.elapsedRealtime() + OPEN_MS + DEVICE_WAIT_MS;
         NET.execute(() -> {
@@ -107,8 +107,8 @@ final class Music {
             }
             LocalDateTime now = LocalDateTime.now();
             if (r == null || r.music == null || r.music.rampEveryMinutes <= 0 || !r.inWindow(now)
-                    || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, now.toLocalDate()).isEmpty()
-                    || Store.marked(app, now.toLocalDate(), "rampOver")) {
+                    || !now.toLocalTime().isBefore(r.music.until) || !Store.ticks(app, r, now.toLocalDate()).isEmpty()
+                    || Store.marked(app, r, now.toLocalDate(), "rampOver")) {
                 return;
             }
             Chime.play();
@@ -160,9 +160,9 @@ final class Music {
         }
     }
 
-    /** Whether the board's music button has stopped the music this morning. */
-    static boolean off(Context c) {
-        return Store.marked(c, LocalDateTime.now().toLocalDate(), "musicOff");
+    /** Whether the board's music button has stopped session r's music today. */
+    static boolean off(Context c, Routine r) {
+        return Store.marked(c, r, LocalDateTime.now().toLocalDate(), "musicOff");
     }
 
     /**
@@ -171,9 +171,9 @@ final class Music {
      */
     static void toggle(Context c, Routine r) {
         Context app = c.getApplicationContext();
-        boolean nowOff = !off(app);
-        Store.mark(app, LocalDateTime.now().toLocalDate(), "musicOff", nowOff);
-        Store.mark(app, LocalDateTime.now().toLocalDate(), "rampOver", true);
+        boolean nowOff = !off(app, r);
+        Store.mark(app, r, LocalDateTime.now().toLocalDate(), "musicOff", nowOff);
+        Store.mark(app, r, LocalDateTime.now().toLocalDate(), "rampOver", true);
         if (nowOff) {
             stop(app, () -> { });
             return;

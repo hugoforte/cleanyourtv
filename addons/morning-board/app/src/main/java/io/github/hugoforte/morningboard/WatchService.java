@@ -15,9 +15,9 @@ import android.os.Looper;
 import java.time.LocalDateTime;
 
 /**
- * Opens the board when the screen turns on inside the routine's window, for a routine with showOnWake. SCREEN_ON is
+ * Opens the board when the screen turns on inside a session's window, for a session with showOnWake. SCREEN_ON is
  * only delivered to a receiver registered at run time, so this foreground service keeps one registered; with no
- * routine, or showOnWake off, it stops itself.
+ * routine, or showOnWake off in every session, it stops itself.
  */
 public class WatchService extends Service {
     /** Open the board now if the window is open: a boot, whose screen came on before the receiver was registered. */
@@ -67,7 +67,7 @@ public class WatchService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (wanted() == null) {
+        if (!anySessionWants()) {
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -75,13 +75,23 @@ public class WatchService extends Service {
         return START_STICKY;
     }
 
-    /** The routine, when it asks to open on wake. */
+    /** The session in play, when it asks to open on wake. */
     private Routine wanted() {
         try {
             Routine r = Store.routine(this);
             return r != null && r.showOnWake ? r : null;
         } catch (IllegalArgumentException e) {
             return null;
+        }
+    }
+
+    /** Whether any session asks to open on wake, which is what keeps this service running. */
+    private boolean anySessionWants() {
+        try {
+            Schedule s = Store.schedule(this);
+            return s != null && s.showOnWake();
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 

@@ -38,14 +38,36 @@ One JSON file, pushed from a computer (`example-routine.json` is a full one):
 |---|---|
 | `days` | The days the routine runs: `MON` … `SUN` |
 | `from`, `until` | The window, in 24-hour `H:mm` |
-| `leave` | When everyone leaves, inside the window; the countdown runs to it |
+| `leave` | Optional: when everyone leaves, inside the window; the countdown runs to it. Without it there is no countdown, and the board says "Until" and the end of the window instead |
 | `showOnWake` | `true` opens the board by itself when the TV is switched on, or boots, inside the window. Off when left out |
 | `turnTvOn` | `true` switches the TV on at `from` and opens the board, and puts the TV back to standby at `until` if the board is still on screen (a show someone started is left playing). Off when left out. **Not on a Sony BRAVIA**: there an app's wake from deep standby turns Android on but leaves the panel dark, so a press of the power button then turns the TV off; use the TV's own on-timer instead (below) |
 | `kids` | One to four, each a `name`, its `steps` (`at` inside the window, one step a time, and `do`) and optional `extras` by day |
-| `email` | Optional: `to` (a list of addresses) and `reportAt` (inside the window; `leave` when left out). An email goes to them once a kid ticks every step inside the window, and at `reportAt` one listing what is still unticked, if anything. Needs a `mail.json` (below) |
+| `email` | Optional: `to` (a list of addresses) and `reportAt` (inside the window; `leave` when left out, and needed when there is no `leave`). An email goes to them once a kid ticks every step inside the window, and at `reportAt` one listing what is still unticked, if anything. Needs a `mail.json` (below) |
 | `weather` | Optional: `latitude`, `longitude` and `unit` (`C` or `F`). The temperature now and today's low and high show under the countdown, from [Open-Meteo](https://open-meteo.com) (no key), read every 15 minutes |
 | `greeting` | Optional: the heading a kid's column gets once every step is ticked, in place of the name, with `{name}`, e.g. `"Good morning {name}! I love you ♥"`. The name alone when left out |
 | `music` | Optional: `uri` (a `spotify:playlist:…`), `device` (the TV's Spotify Connect name, e.g. `"Living Room TV"`), `until` (when it pauses), and for a wake-up ramp `startVolume`, `rampEveryMinutes`, `rampStep` and `maxVolume` (percent; 60 when left out). Needs a `spotify.json` (below) |
+
+### More than one session a day
+
+For an afternoon as well as a morning, the file holds `sessions`, a list of routines like the one above, and nothing
+else:
+
+```json
+{
+  "sessions": [
+    { "days": ["MON", "TUE", "WED", "THU", "FRI"], "from": "7:00", "until": "8:10", "leave": "8:00", "music": { … },
+      "kids": [ … ] },
+    { "days": ["MON", "TUE", "WED", "THU", "FRI"], "from": "16:00", "until": "17:00",
+      "greeting": "Good job {name}!", "kids": [{ "name": "Sam", "steps": [{ "at": "16:00", "do": "Homework" }] }] }
+  ]
+}
+```
+
+Each session has its own fields: days, window, kids, greeting, email, weather and music. Sessions that share a day
+may not overlap. The board shows the session whose window is open, or else the one that opens next, and calls it a
+morning, afternoon or evening by its start time ("Next afternoon: …", "Sam finished the afternoon at 4:12 PM"). Ticks
+are kept per session, so the afternoon starts with its own boxes empty. A file without `sessions` is a single
+session.
 
 The board makes its own sounds: a two-note chime when a step comes due, and a happy run up a chord when a box is
 ticked.
@@ -111,8 +133,8 @@ No accounts beyond your own mail server, no telemetry, no libraries. The routine
 Sony BRAVIA XBR-65X900E (Android TV 9), on the cleanyourtv launcher: installed with `build-and-install.ps1`, the card
 shown after **Show card**, the board showing the next morning's plan outside the window (the screenshot, with
 `example-routine.json`), a routine pushed and taken, and the screen watcher running as a foreground service. The JVM
-tests cover the schedule (the window, which morning is shown, the step under way, the countdown) and the routine's
-refusals.
+tests cover the schedule (the window, which morning is shown, the step under way, the countdown), which session is in
+play and the soonest of each alarm across sessions, and the routine's refusals.
 
 ## Maintainer
 
